@@ -2,15 +2,24 @@ package tunnel
 
 import (
 	"bufio"
+	"crypto/md5"
 	"fmt"
 	"io"
 	"pTunnel/conn"
 	"pTunnel/utils/security"
+	"pTunnel/utils/serialize"
 	"sync"
 )
 
 func ClientTunnelSafetyCheck(tunnel conn.Socket, secretKey []byte) bool {
-	bytes, err := security.AESEncryptBase64(secretKey, secretKey)
+	dict := make(map[string]interface{})
+	dict["SecretKey"] = string(secretKey)
+	dict["Salt"] = string(md5.New().Sum(nil))
+	bytes, err := serialize.Serialize(&dict)
+	if err != nil {
+		return false
+	}
+	bytes, err = security.AESEncryptBase64(bytes, secretKey)
 	if err != nil {
 		return false
 	}
@@ -24,7 +33,12 @@ func ServerTunnelSafetyCheck(tunnel conn.Socket, secretKey []byte) bool {
 		return false
 	}
 	bytes, err = security.AESDecryptBase64(bytes, secretKey)
-	return err == nil && string(bytes) == string(secretKey)
+	if err != nil {
+		return false
+	}
+	dict := make(map[string]interface{})
+	err = serialize.Deserialize(bytes, &dict)
+	return err == nil && dict["SecretKey"].(string) == string(secretKey)
 }
 
 func UnsafeTunnel(request conn.Socket, worker conn.Socket) {
