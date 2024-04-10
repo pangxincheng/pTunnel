@@ -45,8 +45,7 @@ do
     cd ../../..
   done
 done
-
+cd $start_dir
 rm -rf ./release/build
 
-cd $start_dir
 echo "Build success!"
