@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+start_dir=$(pwd)
+
 rm -rf ./release/packages
 mkdir -p ./release/packages
 
@@ -46,5 +48,5 @@ done
 
 rm -rf ./release/build
 
-cd -
+cd $start_dir
 echo "Build success!"
