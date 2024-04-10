@@ -1,0 +1,21 @@
+[common]
+ServerAddr = localhost
+ServerPort = 7000
+PublicKeyFile = cert/PublicKey.pem
+NBitsFile = cert/NBits.txt
+LogFile = console
+LogLevel = info
+LogMaxDays = 3
+
+[ssh]
+InternalAddr = localhost
+InternalPort = 22
+;Currently only support tcp
+InternalType = tcp
+ExternalPort = 2222
+;Currently only support tcp
+ExternalType = tcp
+;tcp/kcp/ssh
+TunnelType = tcp
+;true/false
+TunnelEncrypt = false

@@ -1,0 +1,8 @@
+[common]
+PrivateKeyFile = cert/PrivateKey.pem
+NBitsFile = cert/NBits.txt
+ServerPort = 7000
+LogFile = console
+LogLevel = info
+LogMaxDays = 3
+HeartbeatTimeout = 10
