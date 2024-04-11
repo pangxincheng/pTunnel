@@ -12,25 +12,25 @@ type TCPSocket struct {
 	closeFlag bool
 }
 
-func (socket TCPSocket) Close() error {
+func (socket *TCPSocket) Close() error {
 	socket.closeFlag = true
 	return socket.socket.Close()
 }
 
-func (socket TCPSocket) Write(p []byte) (n int, err error) {
+func (socket *TCPSocket) Write(p []byte) (n int, err error) {
 	return socket.socket.Write(p)
 }
 
-func (socket TCPSocket) Read(p []byte) (n int, err error) {
+func (socket *TCPSocket) Read(p []byte) (n int, err error) {
 	return socket.socket.Read(p)
 }
 
-func (socket TCPSocket) ReadLine() (data []byte, err error) {
+func (socket *TCPSocket) ReadLine() (data []byte, err error) {
 	data, err = socket.reader.ReadBytes('\n')
 	return
 }
 
-func (socket TCPSocket) WriteLine(data []byte) (err error) {
+func (socket *TCPSocket) WriteLine(data []byte) (err error) {
 	_, err = socket.socket.Write(append(data, '\n'))
 	return
 }
@@ -69,7 +69,7 @@ func (listener *TCPListener) Address() (string, int) {
 
 func NewTCPSocket(addr string, port int) (Socket, error) {
 	socket := &TCPSocket{}
-	serverAddr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%d", addr, port))
+	serverAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
 		return nil, err
 	}
@@ -84,11 +84,11 @@ func NewTCPSocket(addr string, port int) (Socket, error) {
 
 func NewTCPListener(addr string, port int) (Listener, error) {
 	listener := &TCPListener{}
-	serverAddr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%d", addr, port))
+	serverAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
 		return nil, err
 	}
-	listener.listener, err = net.ListenTCP("tcp4", serverAddr)
+	listener.listener, err = net.ListenTCP("tcp", serverAddr)
 	if err != nil {
 		return nil, err
 	}

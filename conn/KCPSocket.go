@@ -70,7 +70,8 @@ func (listener *KCPListener) Address() (string, int) {
 
 func NewKCPSocket(addr string, port int) (Socket, error) {
 	socket := &KCPSocket{}
-	kcpConn, err := kcp.DialWithOptions(fmt.Sprintf("%s:%d", addr, port), nil, 10, 3)
+	serverAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", addr, port))
+	kcpConn, err := kcp.DialWithOptions(serverAddr.String(), nil, 10, 3)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +83,7 @@ func NewKCPSocket(addr string, port int) (Socket, error) {
 
 func NewKCPListener(addr string, port int) (Listener, error) {
 	listener := &KCPListener{}
-	serverAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", addr, port))
+	serverAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", addr, port))
 	kcpListener, err := kcp.ListenWithOptions(serverAddr.String(), nil, 10, 3)
 	if err != nil {
 		return nil, err
