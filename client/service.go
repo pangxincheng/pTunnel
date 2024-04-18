@@ -49,6 +49,7 @@ func (service *Service) run(wait *sync.WaitGroup) {
 	dict["ExternalType"] = service.ExternalType
 	dict["TunnelType"] = service.TunnelType
 	dict["TunnelEncrypt"] = service.TunnelEncrypt
+	dict["TunnelPort"] = strconv.Itoa(service.TunnelPort)
 	bytes, err := serialize.Serialize(&dict)
 	if err != nil {
 		log.Error("Service [%s] serialize metadata failed. Error: %v", service.Name, err)
@@ -300,6 +301,7 @@ func RegisterService(
 	internalType string,
 	externalPort int,
 	externalType string,
+	tunnelPort int,
 	tunnelType string,
 	tunnelEncrypt bool,
 ) {
@@ -310,6 +312,7 @@ func RegisterService(
 		InternalType:  internalType,
 		ExternalPort:  externalPort,
 		ExternalType:  externalType,
+		TunnelPort:    tunnelPort,
 		TunnelType:    tunnelType,
 		TunnelEncrypt: tunnelEncrypt,
 	}

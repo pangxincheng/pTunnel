@@ -150,12 +150,19 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 				return err
 			}
 			externalType := v["ExternalType"]
+			tunnelPort := 0
+			if _, ok := v["TunnelPort"]; ok {
+				tunnelPort, err = strconv.Atoi(v["TunnelPort"])
+				if err != nil {
+					return err
+				}
+			}
 			tunnelType := v["TunnelType"]
 			tunnelEncrypt, err := strconv.ParseBool(v["TunnelEncrypt"])
 			if err != nil {
 				return err
 			}
-			client.RegisterService(name, internalAddr, internalPort, internalType, externalPort, externalType, tunnelType, tunnelEncrypt)
+			client.RegisterService(name, internalAddr, internalPort, internalType, externalPort, externalType, tunnelPort, tunnelType, tunnelEncrypt)
 		}
 	}
 

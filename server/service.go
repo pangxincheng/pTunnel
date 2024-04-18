@@ -66,6 +66,14 @@ func (service *Service) run() {
 	service.ExternalType = dict["ExternalType"].(string)
 	service.TunnelEncrypt = dict["TunnelEncrypt"].(bool)
 	service.TunnelType = dict["TunnelType"].(string)
+	if dict["TunnelPort"] != nil {
+		service.TunnelPort, err = strconv.Atoi(dict["TunnelPort"].(string))
+		if err != nil {
+			service.TunnelPort = 0
+		}
+	} else {
+		service.TunnelPort = 0
+	}
 	if strings.ToLower(service.TunnelType) == "ssh" {
 		if SshPort == 0 {
 			log.Error("SshPort is not set")
@@ -160,15 +168,15 @@ func (service *Service) createExternalListener() (err error) {
 
 func (service *Service) createTunnelListener() (err error) {
 	if strings.ToLower(service.TunnelType) == "tcp" {
-		service.TunnelListener, err = conn.NewTCPListener("0.0.0.0", 0)
+		service.TunnelListener, err = conn.NewTCPListener("0.0.0.0", service.TunnelPort)
 	} else if strings.ToLower(service.TunnelType) == "kcp" {
-		service.TunnelListener, err = conn.NewKCPListener("0.0.0.0", 0)
+		service.TunnelListener, err = conn.NewKCPListener("0.0.0.0", service.TunnelPort)
 	} else if strings.ToLower(service.TunnelType) == "udp" {
 		err = errors.New("Unsupported tunnel type: " + service.TunnelType)
 		//service.TunnelListener, err = conn.NewUDPListener("0.0.0.0", 0)
 	} else if strings.ToLower(service.TunnelType) == "ssh" {
 		// Actually, the service.TunnelListener is a TCPListener.
-		service.TunnelListener, err = conn.NewSSHListener("0.0.0.0", 0)
+		service.TunnelListener, err = conn.NewSSHListener("0.0.0.0", service.TunnelPort)
 	} else {
 		err = errors.New("Unsupported tunnel type: " + service.TunnelType)
 	}
