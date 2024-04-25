@@ -1,11 +1,10 @@
-package client
+package proxy
 
 import (
 	"pTunnel/utils/common"
 	"strconv"
 )
 
-// Configurations for the client
 var (
 	PublicKeyFile string
 	NBitsFile     string

@@ -6,6 +6,7 @@ import (
 	tunnel2 "pTunnel/tunnel"
 	"pTunnel/utils/consts"
 	"pTunnel/utils/log"
+	"pTunnel/utils/p2p"
 	"pTunnel/utils/security"
 	"pTunnel/utils/serialize"
 	"strconv"
@@ -174,7 +175,6 @@ func (service *Service) tunnelCreator() {
 	for {
 		_ = <-service.TunnelMsgChan
 		var tunnel conn.Socket
-		var client conn.Socket
 		var err error
 		if strings.ToLower(service.TunnelType) == "tcp" {
 			tunnel, err = conn.NewTCPSocket(ServerAddr, service.TunnelPort)
@@ -202,32 +202,42 @@ func (service *Service) tunnelCreator() {
 				log.Error("Service [%s] create tunnel failed. Error: %v", service.Name, err)
 				continue
 			}
+		} else if strings.ToLower(service.TunnelType) == "p2p" {
+			tunnel, err = conn.NewKCPSocket(ServerAddr, service.TunnelPort)
+			if err != nil {
+				log.Error("Service [%s] create tunnel failed. Error: %v", service.Name, err)
+				continue
+			}
 		} else {
 			log.Error("Service [%s] unknown tunnel type: %s", service.Name, service.TunnelType)
 			continue
 		}
 
-		if strings.ToLower(service.InternalType) == "tcp" {
-			client, err = conn.NewTCPSocket(service.InternalAddr, service.InternalPort)
-			if err != nil {
-				log.Error("Service [%s] connect to internal service failed. Error: %v", service.Name, err)
+		if strings.ToLower(service.TunnelType) != "p2p" {
+			var client conn.Socket
+			if strings.ToLower(service.InternalType) == "tcp" {
+				client, err = conn.NewTCPSocket(service.InternalAddr, service.InternalPort)
+				if err != nil {
+					log.Error("Service [%s] connect to internal service failed. Error: %v", service.Name, err)
+					continue
+				}
+			} else if strings.ToLower(service.InternalType) == "udp" {
+				log.Error("Service [%s] udp internal service is not supported", service.Name)
+				continue
+				//client, err = conn.NewUDPSocket(service.InternalAddr, service.InternalPort)
+				//if err != nil {
+				//	log.Error("Service [%s] connect to internal service failed. Error: %v", service.Name, err)
+				//	continue
+				//}
+			} else {
+				log.Error("Service [%s] unknown internal type: %s", service.Name, service.InternalType)
 				continue
 			}
-		} else if strings.ToLower(service.InternalType) == "udp" {
-			log.Error("Service [%s] udp internal service is not supported", service.Name)
-			continue
-			//client, err = conn.NewUDPSocket(service.InternalAddr, service.InternalPort)
-			//if err != nil {
-			//	log.Error("Service [%s] connect to internal service failed. Error: %v", service.Name, err)
-			//	continue
-			//}
+			// create a net tunnel to process the request
+			go service.tunnel(client, tunnel)
 		} else {
-			log.Error("Service [%s] unknown internal type: %s", service.Name, service.InternalType)
-			continue
+			go service.p2pTunnel(tunnel)
 		}
-
-		// create a net tunnel to process the request
-		go service.tunnel(client, tunnel)
 	}
 }
 
@@ -250,6 +260,58 @@ func (service *Service) tunnel(client conn.Socket, tunnel conn.Socket) {
 	} else {
 		tunnel2.SafeTunnel(client, tunnel, service.SecretKey)
 	}
+}
+
+func (service *Service) p2pTunnel(tunnel conn.Socket) {
+	var mappingType int
+	var filteringType int
+	var err error
+	if NATType != -1 {
+		log.Info("Service [%s] Configured NAT type manually", service.Name)
+		mappingType = NATType / 3
+		filteringType = NATType % 3
+	} else {
+		log.Info("Service [%s] Start to check NAT type automatically", service.Name)
+		mappingType, filteringType, err = p2p.CheckNATType("stun.miwifi.com:3478", 5)
+		if err != nil {
+			log.Error("Service [%s] failed to check NAT type. Error: %v", service.Name, err)
+			return
+		}
+	}
+	log.Info("Service [%s]  NAT type is set to %d(mappingType=%d, filteringType=%d)", service.Name, mappingType*3+filteringType, mappingType, filteringType)
+
+	// Construct metadata, serialize and encrypt
+	dict := make(map[string]interface{})
+	dict["SecretKey"] = string(security.AesGenKey(32))
+	dict["Type"] = "Client"
+	dict["NATType"] = strconv.Itoa(mappingType*3 + filteringType)
+	bytes, err := serialize.Serialize(&dict)
+	if err != nil {
+		log.Error("Service [%s] serialize metadata failed. Error: %v", service.Name, err)
+		return
+	}
+	bytes, err = security.RSAEncryptBase64(bytes, PublicKey, NBits)
+	if err != nil {
+		log.Error("Service [%s] encrypt metadata failed. Error: %v", service.Name, err)
+		return
+	}
+	err = tunnel.WriteLine(bytes)
+	if err != nil {
+		log.Error("Service [%s] send metadata to server failed. Error: %v", service.Name, err)
+		return
+	}
+
+	bytes, err = tunnel.ReadLine()
+	if err != nil {
+		log.Error("Service [%s] receive response from server failed. Error: %v", service.Name, err)
+		return
+	}
+	bytes, err = security.AESDecryptBase64(bytes, []byte(dict["SecretKey"].(string)))
+	if err != nil {
+		log.Error("Service [%s] decrypt response from server failed. Error: %v", service.Name, err)
+		return
+	}
+	fmt.Println(string(bytes))
 }
 
 func (service *Service) controlMsgReader() {

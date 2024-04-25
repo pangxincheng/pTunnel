@@ -18,19 +18,19 @@ type Service struct {
 	ControlSocket    conn.Socket
 	SecretKey        []byte
 	ExternalPort     int
-	ExternalType     string
+	ExternalType     string // tcp, p2p
 	ExternalListener conn.Listener
 	TunnelEncrypt    bool
 	TunnelPort       int
-	TunnelType       string
+	TunnelType       string // tcp, kcp, ssh, p2p
 	TunnelListener   conn.Listener
 	SshPort          int    // only for ssh tunnel
 	SshUser          string // only for ssh tunnel
 	SshPassword      string // only for ssh tunnel
 
 	ControlMsgChan chan int
-	WorkerChan     chan conn.Socket
-	RequestChan    chan conn.Socket
+	WorkerChan     chan *map[string]interface{}
+	RequestChan    chan *map[string]interface{}
 }
 
 func (service *Service) run() {
@@ -127,8 +127,8 @@ func (service *Service) run() {
 	}
 
 	service.ControlMsgChan = make(chan int, 100)
-	service.WorkerChan = make(chan conn.Socket, 100)
-	service.RequestChan = make(chan conn.Socket, 100)
+	service.WorkerChan = make(chan *map[string]interface{}, 100)
+	service.RequestChan = make(chan *map[string]interface{}, 100)
 
 	// Start a new goroutine to listen to the control message from the client
 	go service.controlMsgReader()
@@ -136,30 +136,45 @@ func (service *Service) run() {
 	// Start a new goroutine to send control message to the client
 	go service.controlMsgSender()
 
-	// Start a new goroutine to:
-	// 1. accept socket from the tunnel
-	// 2. add it to WorkerChan
-	go service.tunnelListen()
+	if service.ExternalType != "p2p" {
+		// Start a new goroutine to:
+		// 1. accept socket from the tunnel
+		// 2. add it to WorkerChan
+		go service.tunnelListener()
 
-	// Start a new goroutine to process requests
-	// 1. get a worker from WorkerChan
-	// 2. get a request from RequestChan
-	// 3. start a new goroutine to forward data between worker and request
-	go service.requestProcessor()
+		// Start a new goroutine to process requests
+		// 1. get a worker from WorkerChan
+		// 2. get a request from RequestChan
+		// 3. start a new goroutine to forward data between worker and request
+		go service.requestProcessor()
 
-	// 1. Listen and accept new connections from the ExternalListener
-	// 2. add it to RequestChan
-	// 3. add a CreateTunnel signal to ControlMsgChan
-	service.serverListener()
+		// 1. Listen and accept new connections from the ExternalListener
+		// 2. add it to RequestChan
+		// 3. add a CreateTunnel signal to ControlMsgChan
+		service.serverListener()
+	} else {
+		go service.p2pTunnelListener()
 
+		service.p2pRequestProcessor()
+	}
 }
 
 func (service *Service) createExternalListener() (err error) {
 	if strings.ToLower(service.ExternalType) == "tcp" {
 		service.ExternalListener, err = conn.NewTCPListener("0.0.0.0", service.ExternalPort)
-	} else if strings.ToLower(service.TunnelType) == "udp" {
+	} else if strings.ToLower(service.ExternalType) == "udp" {
 		err = errors.New("Unsupported external type: " + service.ExternalType)
 		//service.ExternalListener, err = conn.NewUDPListener("0.0.0.0", service.ExternalPort)
+	} else if strings.ToLower(service.ExternalType) == "p2p" {
+		if strings.ToLower(service.TunnelType) != "p2p" {
+			err = errors.New("ExternalType is p2p, but TunnelType is not p2p")
+			return
+		}
+		if service.ExternalPort != service.TunnelPort {
+			err = errors.New("ExternalPort is not equal to TunnelPort")
+			return
+		}
+		service.ExternalListener, err = conn.NewKCPListener("0.0.0.0", service.ExternalPort)
 	} else {
 		err = errors.New("Unsupported external type: " + service.ExternalType)
 	}
@@ -177,6 +192,16 @@ func (service *Service) createTunnelListener() (err error) {
 	} else if strings.ToLower(service.TunnelType) == "ssh" {
 		// Actually, the service.TunnelListener is a TCPListener.
 		service.TunnelListener, err = conn.NewSSHListener("0.0.0.0", service.TunnelPort)
+	} else if strings.ToLower(service.TunnelType) == "p2p" {
+		if strings.ToLower(service.ExternalType) != "p2p" {
+			err = errors.New("TunnelType is p2p, but ExternalType is not p2p")
+			return
+		}
+		if service.ExternalPort != service.TunnelPort {
+			err = errors.New("ExternalPort is not equal to TunnelPort")
+			return
+		}
+		service.TunnelListener = service.ExternalListener
 	} else {
 		err = errors.New("Unsupported tunnel type: " + service.TunnelType)
 	}
@@ -251,7 +276,7 @@ func (service *Service) controlMsgSender() {
 	}
 }
 
-func (service *Service) tunnelListen() {
+func (service *Service) tunnelListener() {
 	log.Info(
 		"Tunnel listener(EP: %d, ET: %s, TP: %d, TT: %s) is running",
 		service.ExternalPort, service.ExternalType,
@@ -263,7 +288,9 @@ func (service *Service) tunnelListen() {
 			log.Error("Failed to accept connection from the tunnel. Error: %v", err)
 			break
 		}
-		service.WorkerChan <- accept
+		service.WorkerChan <- &map[string]interface{}{
+			"Socket": accept,
+		}
 	}
 }
 
@@ -280,7 +307,7 @@ func (service *Service) requestProcessor() {
 			log.Error("Worker channel is closed")
 			break
 		}
-		go service.tunnel(request, worker)
+		go service.tunnel((*request)["Socket"].(conn.Socket), (*worker)["Socket"].(conn.Socket))
 	}
 }
 
@@ -317,9 +344,153 @@ func (service *Service) serverListener() {
 			log.Error("Failed to accept connection from the client. Error: %v", err)
 			break
 		}
-		service.RequestChan <- accept
+		service.RequestChan <- &map[string]interface{}{
+			"Socket": accept,
+		}
 		service.ControlMsgChan <- consts.CreateTunnel
 	}
+}
+
+func (service *Service) p2pTunnelListener() {
+	log.Info(
+		"Tunnel listener(EP: %d, ET: %s, TP: %d, TT: %s) is running",
+		service.ExternalPort, service.ExternalType,
+		service.TunnelPort, service.TunnelType,
+	)
+	for {
+		accept, err := service.TunnelListener.Accept()
+		if err != nil {
+			log.Error("Failed to accept connection from the tunnel. Error: %v", err)
+			break
+		}
+		// check whether the accept is a client / a proxy
+		go func(accept conn.Socket) {
+			bytes, err := accept.ReadLine()
+			if err != nil {
+				log.Error("Failed to read the first line from the tunnel. Error: %v", err)
+				return
+			}
+			bytes, err = security.RSADecryptBase64(bytes, PrivateKey, NBits)
+			if err != nil {
+				log.Error("Failed to decrypt the first line from the tunnel. Error: %v", err)
+				return
+			}
+			dict := make(map[string]interface{})
+			err = serialize.Deserialize(bytes, &dict)
+			if err != nil {
+				log.Error("Failed to deserialize metadata from the client. Error: %v", err)
+				return
+			}
+			if dict["Type"].(string) == "Proxy" {
+				// add it to RequestChan
+				service.RequestChan <- &map[string]interface{}{
+					"Socket":   accept,
+					"Metadata": dict,
+				}
+				// add a CreateTunnel signal to ControlMsgChan to create a new tunnel
+				service.ControlMsgChan <- consts.CreateTunnel
+			} else {
+				// add it to WorkerChan
+				service.WorkerChan <- &map[string]interface{}{
+					"Socket":   accept,
+					"Metadata": dict,
+				}
+			}
+		}(accept)
+	}
+}
+
+func (service *Service) p2pRequestProcessor() {
+	for {
+		request, ok := <-service.RequestChan
+		if !ok {
+			log.Error("Request channel is closed")
+			break
+		}
+		worker, ok := <-service.WorkerChan
+		if !ok {
+			log.Error("Worker channel is closed")
+			break
+		}
+		reqSocket := (*request)["Socket"].(conn.Socket)
+		reqMetadata := (*request)["Metadata"].(map[string]interface{})
+		workerSocket := (*worker)["Socket"].(conn.Socket)
+		workerMetadata := (*worker)["Metadata"].(map[string]interface{})
+		go service.p2pTunnel(reqSocket, workerSocket, reqMetadata, workerMetadata)
+	}
+}
+
+var natType2FsmForClient = [9][9]string{
+	{"Fn10", "Fn10", "Fn10", "Fn10", "Fn10", "Fn10", "Fn10", "Fn10", "Fn10"},
+	{"Fn11", "Fn20", "Fn20", "Fn30", "Fn30", "Fn30", "Fn30", "Fn30", "Fn30"},
+	{"Fn11", "Fn20", "Fn20", "Fn30", "Fn30", "Fn30", "Fn30", "Fn30", "Fn30"},
+	{"Fn11", "Fn31", "Fn31", "", "", "", "", "", ""},
+	{"Fn11", "Fn31", "Fn31", "", "", "", "", "", ""},
+	{"Fn11", "Fn31", "Fn31", "", "", "", "", "", ""},
+	{"Fn11", "Fn31", "Fn31", "", "", "", "", "", ""},
+	{"Fn11", "Fn31", "Fn31", "", "", "", "", "", ""},
+	{"Fn11", "Fn31", "Fn31", "", "", "", "", "", ""},
+}
+
+var natType2FsmForTunnel = [9][9]string{
+	{"Fn11", "Fn11", "Fn11", "Fn11", "Fn11", "Fn11", "Fn11", "Fn11", "Fn11"},
+	{"Fn10", "Fn21", "Fn21", "Fn31", "Fn31", "Fn31", "Fn31", "Fn31", "Fn31"},
+	{"Fn10", "Fn21", "Fn21", "Fn31", "Fn31", "Fn31", "Fn31", "Fn31", "Fn31"},
+	{"Fn10", "Fn30", "Fn30", "", "", "", "", "", ""},
+	{"Fn10", "Fn30", "Fn30", "", "", "", "", "", ""},
+	{"Fn10", "Fn30", "Fn30", "", "", "", "", "", ""},
+	{"Fn10", "Fn30", "Fn30", "", "", "", "", "", ""},
+	{"Fn10", "Fn30", "Fn30", "", "", "", "", "", ""},
+	{"Fn10", "Fn30", "Fn30", "", "", "", "", "", ""},
+}
+
+func (service *Service) p2pTunnel(client conn.Socket, tunnel conn.Socket, clientMetadata map[string]interface{}, tunnelMetadata map[string]interface{}) {
+	cNatType, err := strconv.Atoi(clientMetadata["NATType"].(string))
+	if err != nil {
+		log.Error("Failed to convert client NAT type to integer. Error: %v", err)
+		return
+	}
+	tNatType, err := strconv.Atoi(tunnelMetadata["NATType"].(string))
+	if err != nil {
+		log.Error("Failed to convert tunnel NAT type to integer. Error: %v", err)
+		return
+	}
+	clientFSM := natType2FsmForClient[cNatType][tNatType]
+	tunnelFSM := natType2FsmForTunnel[cNatType][tNatType]
+	clientMetadata["FSM"] = tunnelFSM // will be send to the tunnel
+	tunnelMetadata["FSM"] = clientFSM // will be send to the client
+	bytes, err := serialize.Serialize(&clientMetadata)
+	if err != nil {
+		log.Error("Failed to serialize client metadata. Error: %v", err)
+		return
+	}
+	bytes, err = security.AESEncryptBase64(bytes, []byte(tunnelMetadata["SecretKey"].(string)))
+	if err != nil {
+		log.Error("Failed to encrypt client metadata. Error: %v", err)
+		return
+	}
+	err = tunnel.WriteLine(bytes)
+	if err != nil {
+		log.Error("Failed to send client metadata to the tunnel. Error: %v", err)
+		return
+	}
+
+	bytes, err = serialize.Serialize(&tunnelMetadata)
+	if err != nil {
+		log.Error("Failed to serialize tunnel metadata. Error: %v", err)
+		return
+	}
+	bytes, err = security.AESEncryptBase64(bytes, []byte(clientMetadata["SecretKey"].(string)))
+	if err != nil {
+		log.Error("Failed to encrypt tunnel metadata. Error: %v", err)
+		return
+	}
+	err = client.WriteLine(bytes)
+	if err != nil {
+		log.Error("Failed to send tunnel metadata to the client. Error: %v", err)
+		return
+	}
+	time.Sleep(1 * time.Second)
 }
 
 func Run() {
