@@ -1,6 +1,12 @@
 #!/bin/sh
 set -e
 
+function current_tag () {
+    local folder="$(pwd)"
+    [ -n "$1" ] && folder="$1"
+    git -C "$folder" describe --tags
+}
+VERSION=$(current_branch)
 start_dir=$(pwd)
 
 rm -rf ./release/packages
@@ -30,9 +36,9 @@ do
     cp -r ./conf/*.example ./release/build/$i-$j/conf
     cp LICENSE ./release/build/$i-$j
     cp README.md ./release/build/$i-$j
-    GOOS=$i GOARCH=$j go build -o ./release/build/$i-$j/pTunnelClient cmd/client/pTunnelClient.go
-    GOOS=$i GOARCH=$j go build -o ./release/build/$i-$j/pTunnelServer cmd/server/pTunnelServer.go
-    GOOS=$i GOARCH=$j go build -o ./release/build/$i-$j/pTunnelGenRSAKey cmd/genRSAKey/pTunnelGenRSAKey.go
+    GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelClient cmd/client/pTunnelClient.go
+    GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelServer cmd/server/pTunnelServer.go
+    GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelGenRSAKey cmd/genRSAKey/pTunnelGenRSAKey.go
     # check whether the os is windows, if yes, add .exe suffix
     if [ $i = "windows" ]; then
       mv ./release/build/$i-$j/pTunnelClient ./release/build/$i-$j/pTunnelClient.exe
