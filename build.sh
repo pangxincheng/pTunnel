@@ -1,12 +1,12 @@
 #!/bin/sh
 set -e
 
-function current_tag () {
+current_tag() {
     local folder="$(pwd)"
     [ -n "$1" ] && folder="$1"
     git -C "$folder" describe --tags
 }
-VERSION=$(current_branch)
+VERSION=$(current_tag)
 start_dir=$(pwd)
 
 rm -rf ./release/packages
