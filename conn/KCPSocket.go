@@ -2,15 +2,23 @@ package conn
 
 import (
 	"bufio"
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
-	"github.com/xtaci/kcp-go/v5"
 	"net"
+
+	"github.com/pkg/errors"
+	"github.com/xtaci/kcp-go/v5"
 )
 
 type KCPSocket struct {
 	socket    *kcp.UDPSession
 	reader    *bufio.Reader
 	closeFlag bool
+}
+
+func (socket *KCPSocket) GetSocket() *kcp.UDPSession {
+	return socket.socket
 }
 
 func (socket *KCPSocket) Close() error {
@@ -38,6 +46,10 @@ func (socket *KCPSocket) WriteLine(data []byte) (err error) {
 
 type KCPListener struct {
 	listener *kcp.Listener
+}
+
+func (listener *KCPListener) Listener() *kcp.Listener {
+	return listener.listener
 }
 
 func (listener *KCPListener) AcceptKCP() (*KCPSocket, error) {
@@ -71,7 +83,33 @@ func (listener *KCPListener) Address() (string, int) {
 func NewKCPSocket(addr string, port int) (Socket, error) {
 	socket := &KCPSocket{}
 	serverAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", addr, port))
+	if err != nil {
+		return nil, err
+	}
 	kcpConn, err := kcp.DialWithOptions(serverAddr.String(), nil, 10, 3)
+	if err != nil {
+		return nil, err
+	}
+	socket.socket = kcpConn
+	socket.reader = bufio.NewReader(socket.socket)
+	socket.closeFlag = false
+	return socket, nil
+}
+
+func NewKCPSocketV2(laddr *net.UDPAddr, raddr *net.UDPAddr) (Socket, error) {
+	socket := &KCPSocket{}
+	network := "udp4"
+	if raddr.IP.To4() == nil {
+		network = "udp"
+	}
+
+	conn, err := net.ListenUDP(network, laddr)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	var convid uint32
+	binary.Read(rand.Reader, binary.LittleEndian, &convid)
+	kcpConn, err := kcp.NewConn3(convid, raddr, nil, 10, 3, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +122,9 @@ func NewKCPSocket(addr string, port int) (Socket, error) {
 func NewKCPListener(addr string, port int) (Listener, error) {
 	listener := &KCPListener{}
 	serverAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", addr, port))
+	if err != nil {
+		return nil, err
+	}
 	kcpListener, err := kcp.ListenWithOptions(serverAddr.String(), nil, 10, 3)
 	if err != nil {
 		return nil, err

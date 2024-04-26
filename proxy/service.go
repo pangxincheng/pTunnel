@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"fmt"
+	"net"
 	"pTunnel/conn"
 	"pTunnel/utils/log"
 	"pTunnel/utils/p2p"
@@ -66,6 +67,42 @@ func (proxy *Proxy) run() {
 		return
 	}
 	fmt.Println(string(bytes))
+
+	odict := make(map[string]interface{})
+	err = serialize.Deserialize(bytes, &odict)
+	if err != nil {
+		log.Error("Deserialize response from server failed. Error: %v", err)
+		return
+	}
+
+	// UDP hole punching
+	_ = proxy.socket.Close()
+	laddr, err := net.ResolveUDPAddr("udp", proxy.socket.GetSocket().LocalAddr().String())
+	if err != nil {
+		log.Error("Resolve local UDP address failed. Error: %v", err)
+		return
+	}
+	raddr, err := net.ResolveUDPAddr("udp", odict["Addr"].(string))
+	if err != nil {
+		log.Error("Resolve remote UDP address failed. Error: %v", err)
+		return
+	}
+	fmt.Println("laddr: ", laddr, ", raddr: ", raddr)
+	fsmFn := p2p.GetFSM(odict["FSM"].(string))
+	if fsmFn == nil {
+		log.Error("Failed to get FSM function")
+		return
+	}
+	fsm := fsmFn(laddr, raddr)
+	if fsm == nil {
+		log.Error("Failed to create FSM")
+		return
+	}
+	if fsm.Run(1) != 0 {
+		log.Error("Failed to run FSM")
+		return
+	}
+	fmt.Println("UDP hole punching done")
 }
 
 func Run() {

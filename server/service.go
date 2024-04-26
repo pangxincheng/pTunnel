@@ -420,7 +420,7 @@ func (service *Service) p2pRequestProcessor() {
 	}
 }
 
-var natType2FsmForClient = [9][9]string{
+var natType2FsmForProxy = [9][9]string{
 	{"Fn10", "Fn10", "Fn10", "Fn10", "Fn10", "Fn10", "Fn10", "Fn10", "Fn10"},
 	{"Fn11", "Fn20", "Fn20", "Fn30", "Fn30", "Fn30", "Fn30", "Fn30", "Fn30"},
 	{"Fn11", "Fn20", "Fn20", "Fn30", "Fn30", "Fn30", "Fn30", "Fn30", "Fn30"},
@@ -444,8 +444,8 @@ var natType2FsmForTunnel = [9][9]string{
 	{"Fn10", "Fn30", "Fn30", "", "", "", "", "", ""},
 }
 
-func (service *Service) p2pTunnel(client conn.Socket, tunnel conn.Socket, clientMetadata map[string]interface{}, tunnelMetadata map[string]interface{}) {
-	cNatType, err := strconv.Atoi(clientMetadata["NATType"].(string))
+func (service *Service) p2pTunnel(proxy conn.Socket, tunnel conn.Socket, proxyMetadata map[string]interface{}, tunnelMetadata map[string]interface{}) {
+	pNatType, err := strconv.Atoi(proxyMetadata["NATType"].(string))
 	if err != nil {
 		log.Error("Failed to convert client NAT type to integer. Error: %v", err)
 		return
@@ -455,11 +455,13 @@ func (service *Service) p2pTunnel(client conn.Socket, tunnel conn.Socket, client
 		log.Error("Failed to convert tunnel NAT type to integer. Error: %v", err)
 		return
 	}
-	clientFSM := natType2FsmForClient[cNatType][tNatType]
-	tunnelFSM := natType2FsmForTunnel[cNatType][tNatType]
-	clientMetadata["FSM"] = tunnelFSM // will be send to the tunnel
-	tunnelMetadata["FSM"] = clientFSM // will be send to the client
-	bytes, err := serialize.Serialize(&clientMetadata)
+
+	// send to the tunnel
+	metadata := make(map[string]interface{})
+	metadata["Addr"] = proxy.(*conn.KCPSocket).GetSocket().RemoteAddr().String()
+	metadata["FSM"] = natType2FsmForTunnel[pNatType][tNatType]
+	metadata["SecretKey"] = proxyMetadata["SecretKey"]
+	bytes, err := serialize.Serialize(&metadata)
 	if err != nil {
 		log.Error("Failed to serialize client metadata. Error: %v", err)
 		return
@@ -475,17 +477,22 @@ func (service *Service) p2pTunnel(client conn.Socket, tunnel conn.Socket, client
 		return
 	}
 
-	bytes, err = serialize.Serialize(&tunnelMetadata)
+	// send to the proxy
+	metadata = make(map[string]interface{})
+	metadata["Addr"] = tunnel.(*conn.KCPSocket).GetSocket().RemoteAddr().String()
+	metadata["FSM"] = natType2FsmForProxy[pNatType][tNatType]
+	metadata["SecretKey"] = tunnelMetadata["SecretKey"]
+	bytes, err = serialize.Serialize(&metadata)
 	if err != nil {
 		log.Error("Failed to serialize tunnel metadata. Error: %v", err)
 		return
 	}
-	bytes, err = security.AESEncryptBase64(bytes, []byte(clientMetadata["SecretKey"].(string)))
+	bytes, err = security.AESEncryptBase64(bytes, []byte(proxyMetadata["SecretKey"].(string)))
 	if err != nil {
 		log.Error("Failed to encrypt tunnel metadata. Error: %v", err)
 		return
 	}
-	err = client.WriteLine(bytes)
+	err = proxy.WriteLine(bytes)
 	if err != nil {
 		log.Error("Failed to send tunnel metadata to the client. Error: %v", err)
 		return

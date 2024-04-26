@@ -18,7 +18,7 @@ require (
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/stun v0.6.1
 	github.com/pion/transport/v2 v2.2.1 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pkg/errors v0.9.1
 	github.com/shiena/ansicolor v0.0.0-20151119151921-a422bbe96644 // indirect
 	github.com/templexxx/cpu v0.1.0 // indirect
 	github.com/templexxx/xorsimd v0.4.2 // indirect

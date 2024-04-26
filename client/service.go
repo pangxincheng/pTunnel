@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"net"
 	"pTunnel/conn"
 	tunnel2 "pTunnel/tunnel"
 	"pTunnel/utils/consts"
@@ -312,6 +313,42 @@ func (service *Service) p2pTunnel(tunnel conn.Socket) {
 		return
 	}
 	fmt.Println(string(bytes))
+
+	odict := make(map[string]interface{})
+	err = serialize.Deserialize(bytes, &odict)
+	if err != nil {
+		log.Error("Deserialize response from server failed. Error: %v", err)
+		return
+	}
+
+	// UDP Hole Punching
+	_ = tunnel.Close()
+	laddr, err := net.ResolveUDPAddr("udp", tunnel.(*conn.KCPSocket).GetSocket().LocalAddr().String())
+	if err != nil {
+		log.Error("Resolve local UDP address failed. Error: %v", err)
+		return
+	}
+	raddr, err := net.ResolveUDPAddr("udp", odict["Addr"].(string))
+	if err != nil {
+		log.Error("Resolve remote UDP address failed. Error: %v", err)
+		return
+	}
+	fmt.Println("laddr: ", laddr, ", raddr: ", raddr)
+	fsmFn := p2p.GetFSM(odict["FSM"].(string))
+	if fsmFn == nil {
+		log.Error("Service [%s] failed to get fsmFn", service.Name)
+		return
+	}
+	fsm := fsmFn(laddr, raddr)
+	if fsm == nil {
+		log.Error("Service [%s] failed to get fsm", service.Name)
+		return
+	}
+	if fsm.Run(1) != 0 {
+		log.Error("Service [%s] failed to run fsm", service.Name)
+		return
+	}
+	fmt.Printf("Service [%s] p2p tunnel is established\n", service.Name)
 }
 
 func (service *Service) controlMsgReader() {
