@@ -8,15 +8,15 @@ import (
 var (
 	PrivateKeyFile   string
 	NBitsFile        string
+	ServerType       string // tcp, tcp4, tcp6, kcp, kcp4, kcp6
 	ServerPort       int
 	LogFile          string
 	LogWay           string
 	LogLevel         string
 	LogMaxDays       int
 	HeartbeatTimeout int
-	SshPort          int
-	SshUser          string
-	SshPassword      string
+	SshPort          int    // only for ssh tunnel
+	SshUser          string // only for ssh tunnel
 )
 
 var (

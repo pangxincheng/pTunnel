@@ -2,19 +2,24 @@ package proxy
 
 import (
 	"pTunnel/utils/common"
+	"pTunnel/utils/p2p"
 	"strconv"
 )
 
 var (
 	PublicKeyFile string
 	NBitsFile     string
-	ServerAddr    string
+	ServerAddrV4  string
+	ServerAddrV6  string
 	ServerPort    int
+	ServerType    string
 	LogFile       string
 	LogWay        string
 	LogLevel      string
 	LogMaxDays    int
-	NATType       int = -1
+	NatType       int
+	MappingType   int
+	FilteringType int
 )
 
 var (
@@ -36,6 +41,16 @@ func InitConf() error {
 	NBits, err = strconv.Atoi(string(nBits))
 	if err != nil {
 		return err
+	}
+
+	if NatType != -1 {
+		MappingType = NatType / 3
+		FilteringType = NatType % 3
+	} else {
+		MappingType, FilteringType, err = p2p.CheckNATType("stun.miwifi.com:3478", 5)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

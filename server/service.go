@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"pTunnel/conn"
 	tunnel2 "pTunnel/tunnel"
 	"pTunnel/utils/consts"
@@ -18,15 +17,15 @@ type Service struct {
 	ControlSocket    conn.Socket
 	SecretKey        []byte
 	ExternalPort     int
-	ExternalType     string // tcp, p2p
+	ExternalType     string
 	ExternalListener conn.Listener
 	TunnelEncrypt    bool
+	TunnelType       string
 	TunnelPort       int
-	TunnelType       string // tcp, kcp, ssh, p2p
 	TunnelListener   conn.Listener
-	SshPort          int    // only for ssh tunnel
-	SshUser          string // only for ssh tunnel
-	SshPassword      string // only for ssh tunnel
+
+	SshPort int    // only for ssh tunnel
+	SshUser string // only for ssh tunnel
 
 	ControlMsgChan chan int
 	WorkerChan     chan *map[string]interface{}
@@ -34,11 +33,65 @@ type Service struct {
 }
 
 func (service *Service) run() {
+	log.Info("Start a new go routine to handle the connection from %s to %s", service.ControlSocket.RemoteAddr(), service.ControlSocket.LocalAddr())
 	defer func(ControlSocket conn.Socket) {
 		_ = ControlSocket.Close()
 	}(service.ControlSocket)
 
-	// Read the metadata from the client, decrypt and deserialize
+	// Extract metadata
+	if service.extractMetadata() != nil {
+		return
+	}
+
+	// Create a new external listener
+	if service.createExternalListener() != nil {
+		return
+	}
+
+	// Create a new tunnel listener
+	if service.createTunnelListener() != nil {
+		return
+	}
+
+	// Send the metadata to the client
+	if service.sendMetadataToClient() != nil {
+		return
+	}
+
+	service.ControlMsgChan = make(chan int, 100)
+	service.WorkerChan = make(chan *map[string]interface{}, 100)
+	service.RequestChan = make(chan *map[string]interface{}, 100)
+
+	// Start a new goroutine to listen to the control message from the client
+	go service.controlMsgReader()
+
+	// Start a new goroutine to send control message to the client
+	go service.controlMsgSender()
+
+	switch strings.ToLower(service.ExternalType) {
+	case "p2p", "p2p4", "p2p6":
+		go service.p2pTunnelListener()
+		service.p2pRequestProcessor()
+	default:
+		// Start a new goroutine to:
+		// 1. accept socket from the tunnel
+		// 2. add it to WorkerChan
+		go service.tunnelListener()
+
+		// Start a new goroutine to process requests
+		// 1. get a worker from WorkerChan
+		// 2. get a request from RequestChan
+		// 3. start a new goroutine to forward data between worker and request
+		go service.requestProcessor()
+
+		// 1. Listen and accept new connections from the ExternalListener
+		// 2. add it to RequestChan
+		// 3. add a CreateTunnel signal to ControlMsgChan
+		service.serverListener()
+	}
+}
+
+func (service *Service) extractMetadata() (err error) {
 	bytes, err := service.ControlSocket.ReadLine()
 	if err != nil {
 		log.Error("Failed to read metadata from the client. Error: %v", err)
@@ -55,155 +108,94 @@ func (service *Service) run() {
 		log.Error("Failed to deserialize metadata from the client. Error: %v", err)
 		return
 	}
-
-	// Extract the metadata
 	service.SecretKey = []byte(dict["SecretKey"].(string))
 	service.ExternalPort, err = strconv.Atoi(dict["ExternalPort"].(string))
 	if err != nil {
-		log.Error("Failed to convert ExternalPort to integer. Error: %v", err)
+		log.Error("Failed to convert ExternalPort to int. Error: %v", err)
 		return
 	}
 	service.ExternalType = dict["ExternalType"].(string)
 	service.TunnelEncrypt = dict["TunnelEncrypt"].(bool)
 	service.TunnelType = dict["TunnelType"].(string)
-	if dict["TunnelPort"] != nil {
-		service.TunnelPort, err = strconv.Atoi(dict["TunnelPort"].(string))
-		if err != nil {
-			service.TunnelPort = 0
-		}
-	} else {
-		service.TunnelPort = 0
+	TunnelPort, ok := dict["TunnelPort"].(string)
+	if !ok {
+		TunnelPort = "0"
 	}
-	if strings.ToLower(service.TunnelType) == "ssh" {
+	service.TunnelPort, err = strconv.Atoi(TunnelPort)
+	if err != nil {
+		log.Error("Failed to convert TunnelPort to int. Error: %v", err)
+		return
+	}
+	if strings.HasPrefix(strings.ToLower(service.TunnelType), "ssh") {
 		if SshPort == 0 {
 			log.Error("SshPort is not set")
+			err = errors.New("SshPort is not set")
 			return
 		}
 		service.SshPort = SshPort
 		service.SshUser = SshUser
-		service.SshPassword = SshPassword
 	}
-
-	// Create a new external listener
-	err = service.createExternalListener()
-	if err != nil {
-		log.Error("Failed to create external listener. Error: %v", err)
-		return
-	}
-
-	// Create a new tunnel listener
-	err = service.createTunnelListener()
-	if err != nil {
-		log.Error("Failed to create tunnel listener. Error: %v", err)
-		return
-	}
-	_, service.TunnelPort = service.TunnelListener.Address()
-
-	// Construct response, serialize and encrypt
-	dict = make(map[string]interface{})
-	dict["Status"] = strconv.Itoa(200)
-	dict["TunnelPort"] = strconv.Itoa(service.TunnelPort)
-	dict["SshPort"] = strconv.Itoa(service.SshPort)
-	dict["SshUser"] = service.SshUser
-	dict["SshPassword"] = service.SshPassword
-	dict["HeartbeatTimeout"] = strconv.Itoa(HeartbeatTimeout)
-	bytes, err = serialize.Serialize(&dict)
-	if err != nil {
-		log.Error("Failed to serialize response. Error: %v", err)
-		return
-	}
-	bytes, err = security.AESEncryptBase64(bytes, service.SecretKey)
-	if err != nil {
-		log.Error("Failed to encrypt response. Error: %v", err)
-		fmt.Println(service.SecretKey)
-		return
-	}
-
-	// Send response to the client
-	err = service.ControlSocket.WriteLine(bytes)
-	if err != nil {
-		log.Error("Failed to send response to the client. Error: %v", err)
-		return
-	}
-
-	service.ControlMsgChan = make(chan int, 100)
-	service.WorkerChan = make(chan *map[string]interface{}, 100)
-	service.RequestChan = make(chan *map[string]interface{}, 100)
-
-	// Start a new goroutine to listen to the control message from the client
-	go service.controlMsgReader()
-
-	// Start a new goroutine to send control message to the client
-	go service.controlMsgSender()
-
-	if service.ExternalType != "p2p" {
-		// Start a new goroutine to:
-		// 1. accept socket from the tunnel
-		// 2. add it to WorkerChan
-		go service.tunnelListener()
-
-		// Start a new goroutine to process requests
-		// 1. get a worker from WorkerChan
-		// 2. get a request from RequestChan
-		// 3. start a new goroutine to forward data between worker and request
-		go service.requestProcessor()
-
-		// 1. Listen and accept new connections from the ExternalListener
-		// 2. add it to RequestChan
-		// 3. add a CreateTunnel signal to ControlMsgChan
-		service.serverListener()
-	} else {
-		go service.p2pTunnelListener()
-
-		service.p2pRequestProcessor()
-	}
+	return
 }
 
 func (service *Service) createExternalListener() (err error) {
-	if strings.ToLower(service.ExternalType) == "tcp" {
-		service.ExternalListener, err = conn.NewTCPListener("0.0.0.0", service.ExternalPort)
-	} else if strings.ToLower(service.ExternalType) == "udp" {
-		err = errors.New("Unsupported external type: " + service.ExternalType)
-		//service.ExternalListener, err = conn.NewUDPListener("0.0.0.0", service.ExternalPort)
-	} else if strings.ToLower(service.ExternalType) == "p2p" {
-		if strings.ToLower(service.TunnelType) != "p2p" {
-			err = errors.New("ExternalType is p2p, but TunnelType is not p2p")
-			return
-		}
-		if service.ExternalPort != service.TunnelPort {
-			err = errors.New("ExternalPort is not equal to TunnelPort")
-			return
-		}
-		service.ExternalListener, err = conn.NewKCPListener("0.0.0.0", service.ExternalPort)
-	} else {
-		err = errors.New("Unsupported external type: " + service.ExternalType)
+	switch strings.ToLower(service.ExternalType) {
+	case "tcp4", "tcp6":
+		service.ExternalListener, err = conn.NewListener(service.ExternalType, consts.Auto, service.ExternalPort)
+	case "p2p4":
+		service.ExternalListener, err = conn.NewListener("kcp4", consts.Auto, service.ExternalPort)
+	case "p2p6":
+		service.ExternalListener, err = conn.NewListener("kcp6", consts.Auto, service.ExternalPort)
+	default:
+		err = errors.New("unsupported ExternalType")
+	}
+	if err != nil {
+		log.Error("Failed to create external listener. Error: %v", err)
 	}
 	return
 }
 
 func (service *Service) createTunnelListener() (err error) {
-	if strings.ToLower(service.TunnelType) == "tcp" {
-		service.TunnelListener, err = conn.NewTCPListener("0.0.0.0", service.TunnelPort)
-	} else if strings.ToLower(service.TunnelType) == "kcp" {
-		service.TunnelListener, err = conn.NewKCPListener("0.0.0.0", service.TunnelPort)
-	} else if strings.ToLower(service.TunnelType) == "udp" {
-		err = errors.New("Unsupported tunnel type: " + service.TunnelType)
-		//service.TunnelListener, err = conn.NewUDPListener("0.0.0.0", 0)
-	} else if strings.ToLower(service.TunnelType) == "ssh" {
-		// Actually, the service.TunnelListener is a TCPListener.
-		service.TunnelListener, err = conn.NewSSHListener("0.0.0.0", service.TunnelPort)
-	} else if strings.ToLower(service.TunnelType) == "p2p" {
-		if strings.ToLower(service.ExternalType) != "p2p" {
-			err = errors.New("TunnelType is p2p, but ExternalType is not p2p")
-			return
-		}
-		if service.ExternalPort != service.TunnelPort {
-			err = errors.New("ExternalPort is not equal to TunnelPort")
-			return
-		}
+	switch strings.ToLower(service.TunnelType) {
+	case "tcp", "tcp4", "tcp6", "kcp", "kcp4", "kcp6", "ssh", "ssh4", "ssh6":
+		service.TunnelListener, err = conn.NewListener(service.TunnelType, "[auto]", service.TunnelPort)
+	case "p2p", "p2p4", "p2p6":
 		service.TunnelListener = service.ExternalListener
+	default:
+		err = errors.New("unsupported TunnelType")
+	}
+	if err != nil {
+		log.Error("Failed to create tunnel listener. Error: %v", err)
 	} else {
-		err = errors.New("Unsupported tunnel type: " + service.TunnelType)
+		address := strings.Split(service.TunnelListener.Address().String(), ":")
+		service.TunnelPort, err = strconv.Atoi(address[len(address)-1])
+		if err != nil {
+			log.Error("Failed to convert TunnelPort to int. Error: %v", err)
+		}
+	}
+	return
+}
+
+func (service *Service) sendMetadataToClient() (err error) {
+	dict := make(map[string]interface{})
+	dict["Status"] = strconv.Itoa(200)
+	dict["TunnelPort"] = strconv.Itoa(service.TunnelPort)
+	dict["SshPort"] = strconv.Itoa(service.SshPort)
+	dict["SshUser"] = service.SshUser
+	dict["HeartbeatTimeout"] = strconv.Itoa(HeartbeatTimeout)
+	bytes, err := serialize.Serialize(&dict)
+	if err != nil {
+		log.Error("Failed to serialize metadata. Error: %v", err)
+		return
+	}
+	bytes, err = security.AESEncryptBase64(bytes, service.SecretKey)
+	if err != nil {
+		log.Error("Failed to encrypt metadata. Error: %v", err)
+		return
+	}
+	err = service.ControlSocket.WriteLine(bytes)
+	if err != nil {
+		log.Error("Failed to send metadata to the client. Error: %v", err)
 	}
 	return
 }
@@ -241,8 +233,8 @@ func (service *Service) controlMsgReader() {
 			return
 		}
 		switch msg {
-		case consts.HeartBeat:
-			service.ControlMsgChan <- consts.HeartBeat
+		case consts.Heartbeat:
+			service.ControlMsgChan <- consts.Heartbeat
 			timer.Reset(time.Duration(HeartbeatTimeout) * time.Second)
 		default:
 			log.Warn("Unsupported msg: %d", msg)
@@ -312,14 +304,8 @@ func (service *Service) requestProcessor() {
 }
 
 func (service *Service) tunnel(client conn.Socket, tunnel conn.Socket) {
-	closeFn := func(tunnel conn.Socket) {
-		err := tunnel.Close()
-		if err != nil {
-			log.Error("Service close a tunnel failed. Error: %v", err)
-		}
-	}
-	defer closeFn(tunnel)
-	defer closeFn(client)
+	defer tunnel.Close()
+	defer client.Close()
 	if !tunnel2.ServerTunnelSafetyCheck(tunnel, service.SecretKey) {
 		log.Error("Tunnel safety check failed")
 		return
@@ -420,7 +406,7 @@ func (service *Service) p2pRequestProcessor() {
 	}
 }
 
-var natType2FsmForClient = [9][9]string{
+var natType2FsmForProxy = [9][9]string{
 	{"Fn10", "Fn10", "Fn10", "Fn10", "Fn10", "Fn10", "Fn10", "Fn10", "Fn10"},
 	{"Fn11", "Fn20", "Fn20", "Fn30", "Fn30", "Fn30", "Fn30", "Fn30", "Fn30"},
 	{"Fn11", "Fn20", "Fn20", "Fn30", "Fn30", "Fn30", "Fn30", "Fn30", "Fn30"},
@@ -444,8 +430,8 @@ var natType2FsmForTunnel = [9][9]string{
 	{"Fn10", "Fn30", "Fn30", "", "", "", "", "", ""},
 }
 
-func (service *Service) p2pTunnel(client conn.Socket, tunnel conn.Socket, clientMetadata map[string]interface{}, tunnelMetadata map[string]interface{}) {
-	cNatType, err := strconv.Atoi(clientMetadata["NATType"].(string))
+func (service *Service) p2pTunnel(proxy conn.Socket, tunnel conn.Socket, proxyMetadata map[string]interface{}, tunnelMetadata map[string]interface{}) {
+	pNatType, err := strconv.Atoi(proxyMetadata["NATType"].(string))
 	if err != nil {
 		log.Error("Failed to convert client NAT type to integer. Error: %v", err)
 		return
@@ -455,11 +441,30 @@ func (service *Service) p2pTunnel(client conn.Socket, tunnel conn.Socket, client
 		log.Error("Failed to convert tunnel NAT type to integer. Error: %v", err)
 		return
 	}
-	clientFSM := natType2FsmForClient[cNatType][tNatType]
-	tunnelFSM := natType2FsmForTunnel[cNatType][tNatType]
-	clientMetadata["FSM"] = tunnelFSM // will be send to the tunnel
-	tunnelMetadata["FSM"] = clientFSM // will be send to the client
-	bytes, err := serialize.Serialize(&clientMetadata)
+
+	secretKey := security.AesGenKey(32)
+
+	// send to the tunnel
+	metadata := make(map[string]interface{})
+	if addr, ok := proxyMetadata["Addr"]; ok {
+		log.Info("The proxy has configured addr manually: %s", addr)
+		metadata["RAddr"] = addr
+		metadata["RPort"] = proxyMetadata["Port"]
+		metadata["RNetwork"] = proxyMetadata["Network"]
+	} else {
+		log.Info("The proxy has not configured addr manually, use the remote addr of the proxy.")
+		raddress := strings.Split(proxy.RemoteAddr().String(), ":")
+		metadata["RPort"] = raddress[len(raddress)-1]
+		metadata["RAddr"] = strings.Join(raddress[:len(raddress)-1], ":")
+		metadata["RNetwork"] = "udp4"
+		if strings.Contains(metadata["RAddr"].(string), ":") {
+			metadata["RNetwork"] = "udp6"
+		}
+	}
+	metadata["FSMType"] = natType2FsmForTunnel[pNatType][tNatType]
+	metadata["SecretKey"] = string(secretKey)
+	metadata["TunnelEncrypt"] = service.TunnelEncrypt
+	bytes, err := serialize.Serialize(&metadata)
 	if err != nil {
 		log.Error("Failed to serialize client metadata. Error: %v", err)
 		return
@@ -475,17 +480,37 @@ func (service *Service) p2pTunnel(client conn.Socket, tunnel conn.Socket, client
 		return
 	}
 
-	bytes, err = serialize.Serialize(&tunnelMetadata)
+	// send to the proxy
+	metadata = make(map[string]interface{})
+	if addr, ok := tunnelMetadata["Addr"]; ok {
+		log.Info("The tunnel has configured addr manually: %s", addr)
+		metadata["RAddr"] = addr
+		metadata["RPort"] = tunnelMetadata["Port"]
+		metadata["RNetwork"] = tunnelMetadata["Network"]
+	} else {
+		log.Info("The tunnel has not configured addr manually, use the remote addr of the tunnel.")
+		raddress := strings.Split(tunnel.RemoteAddr().String(), ":")
+		metadata["RPort"] = raddress[len(raddress)-1]
+		metadata["RAddr"] = strings.Join(raddress[:len(raddress)-1], ":")
+		metadata["RNetwork"] = "udp4"
+		if strings.Contains(metadata["RAddr"].(string), ":") {
+			metadata["RNetwork"] = "udp6"
+		}
+	}
+	metadata["FSMType"] = natType2FsmForProxy[pNatType][tNatType]
+	metadata["SecretKey"] = string(secretKey)
+	metadata["TunnelEncrypt"] = service.TunnelEncrypt
+	bytes, err = serialize.Serialize(&metadata)
 	if err != nil {
 		log.Error("Failed to serialize tunnel metadata. Error: %v", err)
 		return
 	}
-	bytes, err = security.AESEncryptBase64(bytes, []byte(clientMetadata["SecretKey"].(string)))
+	bytes, err = security.AESEncryptBase64(bytes, []byte(proxyMetadata["SecretKey"].(string)))
 	if err != nil {
 		log.Error("Failed to encrypt tunnel metadata. Error: %v", err)
 		return
 	}
-	err = client.WriteLine(bytes)
+	err = proxy.WriteLine(bytes)
 	if err != nil {
 		log.Error("Failed to send tunnel metadata to the client. Error: %v", err)
 		return
@@ -495,17 +520,16 @@ func (service *Service) p2pTunnel(client conn.Socket, tunnel conn.Socket, client
 
 func Run() {
 	log.InitLog(LogWay, LogFile, LogLevel, LogMaxDays)
-
-	listener, err := conn.NewTCPListener("0.0.0.0", ServerPort)
+	listener, err := conn.NewListener(ServerType, consts.Auto, ServerPort)
 	if err != nil {
-		log.Error("Failed to create TCP listener. Error: %v", err)
+		log.Error("Failed to create listener: %v", err)
 		return
 	}
-
+	log.Info("Server started at %s", listener.Address().String())
 	for {
 		accept, err := listener.Accept()
 		if err != nil {
-			log.Error("Failed to accept connection. Error: %v", err)
+			log.Error("Failed to accept connection: %v", err)
 			continue
 		}
 		service := &Service{

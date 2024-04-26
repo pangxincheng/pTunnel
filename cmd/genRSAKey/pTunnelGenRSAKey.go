@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/docopt/docopt-go"
 	"os"
 	"pTunnel/utils/common"
 	"pTunnel/utils/security"
 	"pTunnel/utils/version"
+
+	"github.com/docopt/docopt-go"
 )
 
 var usage = `pTunnelGenRSAKey is a tool to generate RSA key pair.

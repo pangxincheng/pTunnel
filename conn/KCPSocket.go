@@ -2,28 +2,31 @@ package conn
 
 import (
 	"bufio"
-	"fmt"
-	"github.com/xtaci/kcp-go/v5"
+	"crypto/rand"
+	"encoding/binary"
 	"net"
+
+	"github.com/pkg/errors"
+	"github.com/xtaci/kcp-go/v5"
 )
 
 type KCPSocket struct {
-	socket    *kcp.UDPSession
+	Socket    *kcp.UDPSession
 	reader    *bufio.Reader
 	closeFlag bool
 }
 
 func (socket *KCPSocket) Close() error {
 	socket.closeFlag = true
-	return socket.socket.Close()
+	return socket.Socket.Close()
 }
 
 func (socket *KCPSocket) Write(p []byte) (n int, err error) {
-	return socket.socket.Write(p)
+	return socket.Socket.Write(p)
 }
 
 func (socket *KCPSocket) Read(p []byte) (n int, err error) {
-	return socket.socket.Read(p)
+	return socket.Socket.Read(p)
 }
 
 func (socket *KCPSocket) ReadLine() (data []byte, err error) {
@@ -32,28 +35,40 @@ func (socket *KCPSocket) ReadLine() (data []byte, err error) {
 }
 
 func (socket *KCPSocket) WriteLine(data []byte) (err error) {
-	_, err = socket.socket.Write(append(data, '\n'))
+	_, err = socket.Socket.Write(append(data, '\n'))
 	return
 }
 
+func (socket *KCPSocket) RemoteAddr() net.Addr {
+	return socket.Socket.RemoteAddr()
+}
+
+func (socket *KCPSocket) LocalAddr() net.Addr {
+	return socket.Socket.LocalAddr()
+}
+
+func (socket *KCPSocket) Address() (net.Addr, net.Addr) {
+	return socket.Socket.LocalAddr(), socket.Socket.RemoteAddr()
+}
+
 type KCPListener struct {
-	listener *kcp.Listener
+	Listener *kcp.Listener
 }
 
 func (listener *KCPListener) AcceptKCP() (*KCPSocket, error) {
-	kcpConn, err := listener.listener.AcceptKCP()
+	kcpConn, err := listener.Listener.AcceptKCP()
 	if err != nil {
 		return nil, err
 	}
 	socket := &KCPSocket{}
-	socket.socket = kcpConn
-	socket.reader = bufio.NewReader(socket.socket)
+	socket.Socket = kcpConn
+	socket.reader = bufio.NewReader(socket.Socket)
 	socket.closeFlag = false
 	return socket, nil
 }
 
 func (listener *KCPListener) Close() error {
-	return listener.listener.Close()
+	return listener.Listener.Close()
 }
 
 func (listener *KCPListener) Accept() (Socket, error) {
@@ -64,30 +79,34 @@ func (listener *KCPListener) Network() string {
 	return "kcp"
 }
 
-func (listener *KCPListener) Address() (string, int) {
-	return listener.listener.Addr().(*net.UDPAddr).IP.String(), listener.listener.Addr().(*net.UDPAddr).Port
+func (listener *KCPListener) Address() net.Addr {
+	return listener.Listener.Addr()
 }
 
-func NewKCPSocket(addr string, port int) (Socket, error) {
+func NewKCPSocket(laddr *net.UDPAddr, raddr *net.UDPAddr, network string) (Socket, error) {
 	socket := &KCPSocket{}
-	serverAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", addr, port))
-	kcpConn, err := kcp.DialWithOptions(serverAddr.String(), nil, 10, 3)
+	conn, err := net.ListenUDP(network, laddr)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	var convid uint32
+	binary.Read(rand.Reader, binary.LittleEndian, &convid)
+	kcpConn, err := kcp.NewConn3(convid, raddr, nil, 10, 3, conn)
 	if err != nil {
 		return nil, err
 	}
-	socket.socket = kcpConn
-	socket.reader = bufio.NewReader(socket.socket)
+	socket.Socket = kcpConn
+	socket.reader = bufio.NewReader(socket.Socket)
 	socket.closeFlag = false
 	return socket, nil
 }
 
-func NewKCPListener(addr string, port int) (Listener, error) {
+func NewKCPListener(addr *net.UDPAddr) (Listener, error) {
 	listener := &KCPListener{}
-	serverAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", addr, port))
-	kcpListener, err := kcp.ListenWithOptions(serverAddr.String(), nil, 10, 3)
+	kcpListener, err := kcp.ListenWithOptions(addr.String(), nil, 10, 3)
 	if err != nil {
 		return nil, err
 	}
-	listener.listener = kcpListener
+	listener.Listener = kcpListener
 	return listener, nil
 }
