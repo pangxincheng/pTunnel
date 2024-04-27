@@ -8,6 +8,9 @@ type Socket interface {
 	io.ReadWriteCloser
 	ReadLine() ([]byte, error)
 	WriteLine([]byte) error
+	RemoteAddr() string
+	LocalAddr() string
+	Address() (string, string)
 }
 
 type Listener interface {

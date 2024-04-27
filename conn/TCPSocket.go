@@ -35,6 +35,18 @@ func (socket *TCPSocket) WriteLine(data []byte) (err error) {
 	return
 }
 
+func (socket *TCPSocket) RemoteAddr() string {
+	return socket.socket.RemoteAddr().String()
+}
+
+func (socket *TCPSocket) LocalAddr() string {
+	return socket.socket.LocalAddr().String()
+}
+
+func (socket *TCPSocket) Address() (string, string) {
+	return socket.socket.LocalAddr().String(), socket.socket.RemoteAddr().String()
+}
+
 type TCPListener struct {
 	listener *net.TCPListener
 }

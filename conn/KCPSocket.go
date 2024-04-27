@@ -44,6 +44,18 @@ func (socket *KCPSocket) WriteLine(data []byte) (err error) {
 	return
 }
 
+func (socket *KCPSocket) RemoteAddr() string {
+	return socket.socket.RemoteAddr().String()
+}
+
+func (socket *KCPSocket) LocalAddr() string {
+	return socket.socket.LocalAddr().String()
+}
+
+func (socket *KCPSocket) Address() (string, string) {
+	return socket.socket.LocalAddr().String(), socket.socket.RemoteAddr().String()
+}
+
 type KCPListener struct {
 	listener *kcp.Listener
 }

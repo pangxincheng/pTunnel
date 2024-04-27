@@ -34,6 +34,7 @@ type Service struct {
 }
 
 func (service *Service) run() {
+	log.Info("Start a new go routine to handle the connection from %s to %s", service.ControlSocket.RemoteAddr(), service.ControlSocket.LocalAddr())
 	defer func(ControlSocket conn.Socket) {
 		_ = ControlSocket.Close()
 	}(service.ControlSocket)

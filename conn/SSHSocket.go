@@ -39,6 +39,18 @@ func (socket *SSHSocket) WriteLine(bytes []byte) error {
 	return err
 }
 
+func (socket *SSHSocket) RemoteAddr() string {
+	return (*socket.socket).RemoteAddr().String()
+}
+
+func (socket *SSHSocket) LocalAddr() string {
+	return (*socket.socket).LocalAddr().String()
+}
+
+func (socket *SSHSocket) Address() (string, string) {
+	return (*socket.socket).LocalAddr().String(), (*socket.socket).RemoteAddr().String()
+}
+
 func NewSSHSocket(addr string, port int, sshPort int, sshUser string, sshPassword string) (Socket, error) {
 	socket := &SSHSocket{}
 	serverAddr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%d", addr, sshPort))
