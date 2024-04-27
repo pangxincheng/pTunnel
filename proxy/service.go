@@ -108,7 +108,7 @@ func (proxy *Proxy) run() {
 func Run() {
 	log.InitLog(LogWay, LogFile, LogLevel, LogMaxDays)
 
-	socket, err := conn.NewKCPSocket(ServerAddr, ServerPort)
+	socket, err := conn.NewKCPSocket(ServerAddr, ServerPort, "udp")
 	if err != nil {
 		log.Error("Failed to create KCP Socket. Error: %v", err)
 		return

@@ -3,12 +3,13 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/docopt/docopt-go"
-	"github.com/vaughan0/go-ini"
 	"os"
 	"pTunnel/server"
 	"pTunnel/utils/version"
 	"strconv"
+
+	"github.com/docopt/docopt-go"
+	"github.com/vaughan0/go-ini"
 )
 
 var usage = `pTunnelServer is the server application for the pTunnel.
@@ -19,7 +20,8 @@ Options:
 	-h --help                                Show help information in screen.
 	--version                                Show version.
 	-c --config-file=<config-file>           Specify the config file path. [default: ./conf/server.ini]
-	-s --server-port=<server-port>           Specify the server port.
+	--server-type=<server-type>              Specify the server type. [options: tcp, tcp4, tcp6]
+	--server-port=<server-port>              Specify the server port.
 	-p --private-key-file=<private-key-file> Specify the private key file.
 	-n --nBits-file=<nBits-file>             Specify the NBits file.
 	-l --log-file=<log-level>                Specify the path to the log file.
@@ -72,6 +74,17 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 	}
 	server.NBitsFile = args["--nBits-file"].(string)
 
+	// ServerType
+	if args["--server-type"] == nil {
+		tmpStr, ok := conf.Get("common", "ServerType")
+		if ok {
+			args["--server-type"] = tmpStr
+		} else {
+			args["--server-type"] = "0.0.0.0" // Default IPV4 address
+		}
+	}
+	server.ServerType = args["--server-type"].(string)
+
 	// ServerPort
 	if args["--server-port"] == nil {
 		tmpStr, ok := conf.Get("common", "ServerPort")
@@ -123,6 +136,9 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		}
 	}
 	server.LogMaxDays, err = strconv.Atoi(args["--log-max-days"].(string))
+	if err != nil {
+		return err
+	}
 
 	// HeartbeatTimeout
 	if args["--heartbeat-timeout"] == nil {
@@ -134,6 +150,9 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		}
 	}
 	server.HeartbeatTimeout, err = strconv.Atoi(args["--heartbeat-timeout"].(string))
+	if err != nil {
+		return err
+	}
 
 	// SshPort
 	if args["--ssh-port"] == nil {

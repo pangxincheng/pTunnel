@@ -8,6 +8,7 @@ import (
 var (
 	PrivateKeyFile   string
 	NBitsFile        string
+	ServerType       string
 	ServerPort       int
 	LogFile          string
 	LogWay           string

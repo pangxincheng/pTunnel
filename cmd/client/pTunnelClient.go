@@ -7,6 +7,7 @@ import (
 	"pTunnel/client"
 	"pTunnel/utils/version"
 	"strconv"
+	"strings"
 
 	"github.com/docopt/docopt-go"
 	"github.com/vaughan0/go-ini"
@@ -20,7 +21,8 @@ Options:
 	-h --help                              Show help information in screen.
 	--version                              Show version.
 	-c --config-file=<config-file>         Specify the config file path. [default: ./conf/client.ini]
-	--server-addr=<server-addr>            Specify the server address.
+	--server-addr-v4=<server-addr-v4>      Specify the server ipv4 address.
+	--server-addr-v6=<server-addr-v6>      Specify the server ipv6 address.
 	--server-port=<server-port>            Specify the server port.
 	-p --public-key-file=<public-key-file> Specify the public key file.
 	-n --nBits-file=<nBits-file>           Specify the NBits file.
@@ -71,16 +73,38 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 	}
 	client.NBitsFile = args["--nBits-file"].(string)
 
-	// ServerAddr
-	if args["--server-addr"] == nil {
-		tmpStr, ok := conf.Get("common", "ServerAddr")
+	// ServerAddrV4
+	if args["--server-addr-v4"] == nil {
+		tmpStr, ok := conf.Get("common", "ServerAddrV4")
 		if ok {
-			args["--server-addr"] = tmpStr
+			args["--server-addr-v4"] = tmpStr
 		} else {
 			return errors.New("ServerAddr is not specified")
 		}
 	}
-	client.ServerAddr = args["--server-addr"].(string)
+	client.ServerAddrV4 = args["--server-addr-v4"].(string)
+
+	// ServerAddrV6
+	if args["--server-addr-v6"] == nil {
+		tmpStr, ok := conf.Get("common", "ServerAddrV6")
+		if ok {
+			args["--server-addr-v6"] = tmpStr
+		} else {
+			args["--server-addr-v6"] = ""
+		}
+	}
+	client.ServerAddrV6 = args["--server-addr-v6"].(string)
+
+	// ServerType
+	if args["--server-type"] == nil {
+		tmpStr, ok := conf.Get("common", "ServerType")
+		if ok {
+			args["--server-type"] = tmpStr
+		} else {
+			return errors.New("ServerType is not specified")
+		}
+	}
+	client.ServerType = args["--server-type"].(string)
 
 	// ServerPort
 	if args["--server-port"] == nil {
@@ -161,11 +185,6 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 				return err
 			}
 			internalType := v["InternalType"]
-			externalPort, err := strconv.Atoi(v["ExternalPort"])
-			if err != nil {
-				return err
-			}
-			externalType := v["ExternalType"]
 			tunnelPort := 0
 			if _, ok := v["TunnelPort"]; ok {
 				tunnelPort, err = strconv.Atoi(v["TunnelPort"])
@@ -178,6 +197,16 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			if err != nil {
 				return err
 			}
+			externalPort := tunnelPort
+			externalType := tunnelType
+			if !strings.HasPrefix(strings.ToLower(tunnelType), "p2p") {
+				externalPort, err = strconv.Atoi(v["ExternalPort"])
+				if err != nil {
+					return err
+				}
+				externalType = v["ExternalType"]
+			}
+
 			client.RegisterService(name, internalAddr, internalPort, internalType, externalPort, externalType, tunnelPort, tunnelType, tunnelEncrypt)
 		}
 	}

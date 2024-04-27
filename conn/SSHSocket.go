@@ -3,8 +3,9 @@ package conn
 import (
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/ssh"
 	"net"
+
+	"golang.org/x/crypto/ssh"
 )
 
 type SSHSocket struct {
@@ -65,6 +66,6 @@ func NewSSHSocket(addr string, port int, sshPort int, sshUser string, sshPasswor
 	return socket, nil
 }
 
-func NewSSHListener(addr string, port int) (Listener, error) {
-	return NewTCPListener(addr, port)
+func NewSSHListener(addr string, port int, network string) (Listener, error) {
+	return NewTCPListener(addr, port, network)
 }

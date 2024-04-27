@@ -1,5 +1,7 @@
 [common]
-ServerAddr = localhost
+ServerAddrV4 = localhost
+ServerAddrV6 = ip6-localhost
+ServerType = tcp6
 ServerPort = 7000
 PublicKeyFile = cert/PublicKey.pem
 NBitsFile = cert/NBits.txt
@@ -10,14 +12,17 @@ LogMaxDays = 3
 [ssh]
 InternalAddr = localhost
 InternalPort = 22
-;Currently only support tcp
+;tcp
 InternalType = tcp
-ExternalPort = 2222
-;Currently only support tcp
-ExternalType = tcp
 ; 0-65535, if 0 is specified, the server will allocate automatically
-TunnelPort = 8888
-;tcp/kcp/ssh
-TunnelType = tcp
+TunnelPort = 7890
+;tcp/tcp4/tcp6/kcp/kcp4/kcp6/ssh/p2p/p2p4/p2p6
+TunnelType = tcp6
 ;true/false
 TunnelEncrypt = false
+; if TunnelType is not p2p/p2p4/p2p6, the following parameters are required
+
+; 0-65535, if 0 is specified, the server will allocate automatically
+ExternalPort = 2222
+;tcp/tcp4/tcp6/p2p/p2p4/p2p6
+ExternalType = tcp4

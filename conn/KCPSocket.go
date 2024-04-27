@@ -80,9 +80,9 @@ func (listener *KCPListener) Address() (string, int) {
 	return listener.listener.Addr().(*net.UDPAddr).IP.String(), listener.listener.Addr().(*net.UDPAddr).Port
 }
 
-func NewKCPSocket(addr string, port int) (Socket, error) {
+func NewKCPSocket(addr string, port int, network string) (Socket, error) {
 	socket := &KCPSocket{}
-	serverAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", addr, port))
+	serverAddr, err := net.ResolveUDPAddr(network, fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
 		return nil, err
 	}
@@ -119,9 +119,9 @@ func NewKCPSocketV2(laddr *net.UDPAddr, raddr *net.UDPAddr) (Socket, error) {
 	return socket, nil
 }
 
-func NewKCPListener(addr string, port int) (Listener, error) {
+func NewKCPListener(addr string, port int, network string) (Listener, error) {
 	listener := &KCPListener{}
-	serverAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", addr, port))
+	serverAddr, err := net.ResolveUDPAddr(network, fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
 		return nil, err
 	}

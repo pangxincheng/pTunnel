@@ -1,6 +1,8 @@
 [common]
 PrivateKeyFile = cert/PrivateKey.pem
 NBitsFile = cert/NBits.txt
+; tcp/tcp4/tcp6
+ServerType = tcp6
 ServerPort = 7000
 LogFile = console
 LogLevel = info

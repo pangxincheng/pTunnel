@@ -9,7 +9,9 @@ import (
 var (
 	PublicKeyFile string
 	NBitsFile     string
-	ServerAddr    string
+	ServerAddrV4  string
+	ServerAddrV6  string
+	ServerType    string
 	ServerPort    int
 	LogFile       string
 	LogWay        string

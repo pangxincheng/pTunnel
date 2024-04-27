@@ -160,49 +160,40 @@ func (service *Service) run() {
 }
 
 func (service *Service) createExternalListener() (err error) {
-	if strings.ToLower(service.ExternalType) == "tcp" {
-		service.ExternalListener, err = conn.NewTCPListener("0.0.0.0", service.ExternalPort)
-	} else if strings.ToLower(service.ExternalType) == "udp" {
-		err = errors.New("Unsupported external type: " + service.ExternalType)
-		//service.ExternalListener, err = conn.NewUDPListener("0.0.0.0", service.ExternalPort)
-	} else if strings.ToLower(service.ExternalType) == "p2p" {
-		if strings.ToLower(service.TunnelType) != "p2p" {
-			err = errors.New("ExternalType is p2p, but TunnelType is not p2p")
-			return
-		}
-		if service.ExternalPort != service.TunnelPort {
-			err = errors.New("ExternalPort is not equal to TunnelPort")
-			return
-		}
-		service.ExternalListener, err = conn.NewKCPListener("0.0.0.0", service.ExternalPort)
-	} else {
+	switch strings.ToLower(service.ExternalType) {
+	case "tcp", "tcp4":
+		log.Info("Listen on ipv4")
+		service.ExternalListener, err = conn.NewTCPListener("0.0.0.0", service.ExternalPort, "tcp4")
+	case "tcp6":
+		log.Info("Listen on ipv6")
+		service.ExternalListener, err = conn.NewTCPListener("[::]", service.ExternalPort, "tcp6")
+	case "p2p", "p2p4":
+		log.Info("Listen on p2p4")
+		service.ExternalListener, err = conn.NewKCPListener("0.0.0.0", service.ExternalPort, "udp4")
+	case "p2p6":
+		log.Info("Listen on p2p6")
+		service.ExternalListener, err = conn.NewKCPListener("[::]", service.ExternalPort, "udp6")
+	default:
 		err = errors.New("Unsupported external type: " + service.ExternalType)
 	}
 	return
 }
 
 func (service *Service) createTunnelListener() (err error) {
-	if strings.ToLower(service.TunnelType) == "tcp" {
-		service.TunnelListener, err = conn.NewTCPListener("0.0.0.0", service.TunnelPort)
-	} else if strings.ToLower(service.TunnelType) == "kcp" {
-		service.TunnelListener, err = conn.NewKCPListener("0.0.0.0", service.TunnelPort)
-	} else if strings.ToLower(service.TunnelType) == "udp" {
-		err = errors.New("Unsupported tunnel type: " + service.TunnelType)
-		//service.TunnelListener, err = conn.NewUDPListener("0.0.0.0", 0)
-	} else if strings.ToLower(service.TunnelType) == "ssh" {
-		// Actually, the service.TunnelListener is a TCPListener.
-		service.TunnelListener, err = conn.NewSSHListener("0.0.0.0", service.TunnelPort)
-	} else if strings.ToLower(service.TunnelType) == "p2p" {
-		if strings.ToLower(service.ExternalType) != "p2p" {
-			err = errors.New("TunnelType is p2p, but ExternalType is not p2p")
-			return
-		}
-		if service.ExternalPort != service.TunnelPort {
-			err = errors.New("ExternalPort is not equal to TunnelPort")
-			return
-		}
+	switch strings.ToLower(service.TunnelType) {
+	case "tcp", "tcp4":
+		service.TunnelListener, err = conn.NewTCPListener("0.0.0.0", service.TunnelPort, "tcp4")
+	case "tcp6":
+		service.TunnelListener, err = conn.NewTCPListener("[::]", service.TunnelPort, "tcp6")
+	case "kcp", "kcp4":
+		service.TunnelListener, err = conn.NewKCPListener("0.0.0.0", service.TunnelPort, "udp4")
+	case "kcp6":
+		service.TunnelListener, err = conn.NewKCPListener("[::]", service.TunnelPort, "udp6")
+	case "ssh":
+		service.TunnelListener, err = conn.NewSSHListener("0.0.0.0", service.TunnelPort, "tcp4")
+	case "p2p", "p2p4", "p2p6":
 		service.TunnelListener = service.ExternalListener
-	} else {
+	default:
 		err = errors.New("Unsupported tunnel type: " + service.TunnelType)
 	}
 	return
@@ -502,8 +493,14 @@ func (service *Service) p2pTunnel(proxy conn.Socket, tunnel conn.Socket, proxyMe
 
 func Run() {
 	log.InitLog(LogWay, LogFile, LogLevel, LogMaxDays)
-
-	listener, err := conn.NewTCPListener("0.0.0.0", ServerPort)
+	var listener conn.Listener
+	var err error
+	switch strings.ToLower(ServerType) {
+	case "tcp", "tcp4":
+		listener, err = conn.NewTCPListener("0.0.0.0", ServerPort, "tcp4")
+	case "tcp6":
+		listener, err = conn.NewTCPListener("[::]", ServerPort, "tcp6")
+	}
 	if err != nil {
 		log.Error("Failed to create TCP listener. Error: %v", err)
 		return

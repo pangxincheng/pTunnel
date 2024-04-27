@@ -64,7 +64,17 @@ func (service *Service) run(wait *sync.WaitGroup) {
 	}
 
 	// Connect to the server
-	service.ControlSocket, err = conn.NewTCPSocket(ServerAddr, ServerPort)
+	switch ServerType {
+	case "tcp", "tcp4":
+		log.Info("Service [%s] connect to server %s:%d", service.Name, ServerAddrV4, ServerPort)
+		service.ControlSocket, err = conn.NewTCPSocket(ServerAddrV4, ServerPort, "tcp4")
+	case "tcp6":
+		log.Info("Service [%s] connect to server %s:%d", service.Name, ServerAddrV6, ServerPort)
+		service.ControlSocket, err = conn.NewTCPSocket(ServerAddrV6, ServerPort, "tcp6")
+	default:
+		log.Error("Unknown server type: %s", ServerType)
+		return
+	}
 	if err != nil {
 		log.Error("Service [%s] connect to server failed. Error: %v", service.Name, err)
 		return
@@ -177,60 +187,39 @@ func (service *Service) tunnelCreator() {
 		_ = <-service.TunnelMsgChan
 		var tunnel conn.Socket
 		var err error
-		if strings.ToLower(service.TunnelType) == "tcp" {
-			tunnel, err = conn.NewTCPSocket(ServerAddr, service.TunnelPort)
-			if err != nil {
-				log.Error("Service [%s] create tunnel failed. Error: %v", service.Name, err)
-				continue
-			}
-		} else if strings.ToLower(service.TunnelType) == "kcp" {
-			tunnel, err = conn.NewKCPSocket(ServerAddr, service.TunnelPort)
-			if err != nil {
-				log.Error("Service [%s] create tunnel failed. Error: %v", service.Name, err)
-				continue
-			}
-		} else if strings.ToLower(service.TunnelType) == "udp" {
-			log.Error("Service [%s] udp tunnel is not supported", service.Name)
-			continue
-			//tunnel, err = conn.NewUDPSocket(ServerAddr, service.TunnelPort)
-			//if err != nil {
-			//	log.Error("Service [%s] create tunnel failed. Error: %v", service.Name, err)
-			//	continue
-			//}
-		} else if strings.ToLower(service.TunnelType) == "ssh" {
-			tunnel, err = conn.NewSSHSocket(ServerAddr, service.TunnelPort, service.SshPort, service.SshUser, service.SshPassword)
-			if err != nil {
-				log.Error("Service [%s] create tunnel failed. Error: %v", service.Name, err)
-				continue
-			}
-		} else if strings.ToLower(service.TunnelType) == "p2p" {
-			tunnel, err = conn.NewKCPSocket(ServerAddr, service.TunnelPort)
-			if err != nil {
-				log.Error("Service [%s] create tunnel failed. Error: %v", service.Name, err)
-				continue
-			}
-		} else {
+		switch strings.ToLower(service.TunnelType) {
+		case "tcp", "tcp4":
+			tunnel, err = conn.NewTCPSocket(ServerAddrV4, service.TunnelPort, "tcp4")
+		case "tcp6":
+			tunnel, err = conn.NewTCPSocket(ServerAddrV6, service.TunnelPort, "tcp6")
+		case "kcp", "kcp4":
+			tunnel, err = conn.NewKCPSocket(ServerAddrV4, service.TunnelPort, "udp4")
+		case "kcp6":
+			tunnel, err = conn.NewKCPSocket(ServerAddrV6, service.TunnelPort, "udp6")
+		case "ssh":
+			tunnel, err = conn.NewSSHSocket(ServerAddrV4, service.TunnelPort, service.SshPort, service.SshUser, service.SshPassword)
+		case "p2p", "p2p4":
+			tunnel, err = conn.NewKCPSocket(ServerAddrV4, service.TunnelPort, "udp4")
+		case "p2p6":
+			tunnel, err = conn.NewKCPSocket(ServerAddrV6, service.TunnelPort, "udp6")
+		default:
 			log.Error("Service [%s] unknown tunnel type: %s", service.Name, service.TunnelType)
+		}
+		if err != nil {
+			log.Error("Service [%s] connect to tunnel failed. Error: %v", service.Name, err)
 			continue
 		}
 
 		if strings.ToLower(service.TunnelType) != "p2p" {
 			var client conn.Socket
-			if strings.ToLower(service.InternalType) == "tcp" {
-				client, err = conn.NewTCPSocket(service.InternalAddr, service.InternalPort)
+			switch strings.ToLower(service.InternalType) {
+			case "tcp", "tcp4", "tcp6":
+				client, err = conn.NewTCPSocket(service.InternalAddr, service.InternalPort, "tcp")
 				if err != nil {
 					log.Error("Service [%s] connect to internal service failed. Error: %v", service.Name, err)
 					continue
 				}
-			} else if strings.ToLower(service.InternalType) == "udp" {
-				log.Error("Service [%s] udp internal service is not supported", service.Name)
-				continue
-				//client, err = conn.NewUDPSocket(service.InternalAddr, service.InternalPort)
-				//if err != nil {
-				//	log.Error("Service [%s] connect to internal service failed. Error: %v", service.Name, err)
-				//	continue
-				//}
-			} else {
+			default:
 				log.Error("Service [%s] unknown internal type: %s", service.Name, service.InternalType)
 				continue
 			}

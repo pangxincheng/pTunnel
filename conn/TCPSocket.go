@@ -67,13 +67,13 @@ func (listener *TCPListener) Address() (string, int) {
 	return listener.listener.Addr().(*net.TCPAddr).IP.String(), listener.listener.Addr().(*net.TCPAddr).Port
 }
 
-func NewTCPSocket(addr string, port int) (Socket, error) {
+func NewTCPSocket(addr string, port int, network string) (Socket, error) {
 	socket := &TCPSocket{}
-	serverAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", addr, port))
+	serverAddr, err := net.ResolveTCPAddr(network, fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
 		return nil, err
 	}
-	socket.socket, err = net.DialTCP("tcp", nil, serverAddr)
+	socket.socket, err = net.DialTCP(network, nil, serverAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -82,13 +82,13 @@ func NewTCPSocket(addr string, port int) (Socket, error) {
 	return socket, nil
 }
 
-func NewTCPListener(addr string, port int) (Listener, error) {
+func NewTCPListener(addr string, port int, network string) (Listener, error) {
 	listener := &TCPListener{}
-	serverAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", addr, port))
+	serverAddr, err := net.ResolveTCPAddr(network, fmt.Sprintf("%s:%d", addr, port))
 	if err != nil {
 		return nil, err
 	}
-	listener.listener, err = net.ListenTCP("tcp", serverAddr)
+	listener.listener, err = net.ListenTCP(network, serverAddr)
 	if err != nil {
 		return nil, err
 	}
