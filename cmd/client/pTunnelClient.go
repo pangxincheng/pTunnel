@@ -207,7 +207,12 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 				externalType = v["ExternalType"]
 			}
 
-			client.RegisterService(name, internalAddr, internalPort, internalType, externalPort, externalType, tunnelPort, tunnelType, tunnelEncrypt)
+			ip := ""
+			if _, ok := v["IP"]; ok {
+				ip = v["IP"]
+			}
+
+			client.RegisterService(name, internalAddr, internalPort, internalType, externalPort, externalType, tunnelPort, tunnelType, tunnelEncrypt, ip)
 		}
 	}
 

@@ -446,7 +446,13 @@ func (service *Service) p2pTunnel(proxy conn.Socket, tunnel conn.Socket, proxyMe
 
 	// send to the tunnel
 	metadata := make(map[string]interface{})
-	metadata["Addr"] = proxy.(*conn.KCPSocket).GetSocket().RemoteAddr().String()
+	if addr, ok := proxyMetadata["Addr"]; ok {
+		log.Info("The proxy has configured addr manually: %s", addr)
+		metadata["Addr"] = addr
+	} else {
+		log.Info("The proxy has not configured addr manually, use the remote addr of the proxy.")
+		metadata["Addr"] = proxy.(*conn.KCPSocket).GetSocket().RemoteAddr().String()
+	}
 	metadata["FSM"] = natType2FsmForTunnel[pNatType][tNatType]
 	metadata["SecretKey"] = proxyMetadata["SecretKey"]
 	bytes, err := serialize.Serialize(&metadata)
@@ -467,7 +473,13 @@ func (service *Service) p2pTunnel(proxy conn.Socket, tunnel conn.Socket, proxyMe
 
 	// send to the proxy
 	metadata = make(map[string]interface{})
-	metadata["Addr"] = tunnel.(*conn.KCPSocket).GetSocket().RemoteAddr().String()
+	if addr, ok := tunnelMetadata["Addr"]; ok {
+		log.Info("The tunnel has configured addr manually: %s", addr)
+		metadata["Addr"] = addr
+	} else {
+		log.Info("The tunnel has not configured addr manually, use the remote addr of the tunnel.")
+		metadata["Addr"] = tunnel.(*conn.KCPSocket).GetSocket().RemoteAddr().String()
+	}
 	metadata["FSM"] = natType2FsmForProxy[pNatType][tNatType]
 	metadata["SecretKey"] = tunnelMetadata["SecretKey"]
 	bytes, err = serialize.Serialize(&metadata)

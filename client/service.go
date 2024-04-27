@@ -31,6 +31,7 @@ type Service struct {
 	SshPort          int    // only for ssh tunnel
 	SshUser          string // only for ssh tunnel
 	SshPassword      string // only for ssh tunnel
+	IP               string // only for p2p tunnel
 
 	ControlSocket  conn.Socket
 	ControlMsgChan chan int
@@ -273,6 +274,9 @@ func (service *Service) p2pTunnel(tunnel conn.Socket) {
 	// Construct metadata, serialize and encrypt
 	dict := make(map[string]interface{})
 	dict["SecretKey"] = string(security.AesGenKey(32))
+	if service.IP != "" {
+		dict["Addr"] = service.IP
+	}
 	dict["Type"] = "Client"
 	dict["NATType"] = strconv.Itoa(mappingType*3 + filteringType)
 	bytes, err := serialize.Serialize(&dict)
@@ -392,6 +396,7 @@ func RegisterService(
 	tunnelPort int,
 	tunnelType string,
 	tunnelEncrypt bool,
+	ip string,
 ) {
 	services[name] = &Service{
 		Name:          name,
@@ -403,6 +408,7 @@ func RegisterService(
 		TunnelPort:    tunnelPort,
 		TunnelType:    tunnelType,
 		TunnelEncrypt: tunnelEncrypt,
+		IP:            ip,
 	}
 }
 
