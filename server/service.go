@@ -162,16 +162,12 @@ func (service *Service) run() {
 func (service *Service) createExternalListener() (err error) {
 	switch strings.ToLower(service.ExternalType) {
 	case "tcp", "tcp4":
-		log.Info("Listen on ipv4")
 		service.ExternalListener, err = conn.NewTCPListener("0.0.0.0", service.ExternalPort, "tcp4")
 	case "tcp6":
-		log.Info("Listen on ipv6")
 		service.ExternalListener, err = conn.NewTCPListener("[::]", service.ExternalPort, "tcp6")
 	case "p2p", "p2p4":
-		log.Info("Listen on p2p4")
 		service.ExternalListener, err = conn.NewKCPListener("0.0.0.0", service.ExternalPort, "udp4")
 	case "p2p6":
-		log.Info("Listen on p2p6")
 		service.ExternalListener, err = conn.NewKCPListener("[::]", service.ExternalPort, "udp6")
 	default:
 		err = errors.New("Unsupported external type: " + service.ExternalType)

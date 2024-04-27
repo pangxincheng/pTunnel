@@ -366,6 +366,7 @@ var fsmType2Func = map[string]FsmFn{
 		})
 		return v
 	},
+	// TODO: Implement a more robust version of Fn30
 	"Fn30": func(laddr *net.UDPAddr, raddr *net.UDPAddr) *FSM {
 		v := NewFSM(&SocketWrapper{
 			laddr: laddr,
@@ -388,28 +389,28 @@ var fsmType2Func = map[string]FsmFn{
 			SEND_HEARTBEAT
 			ERR_STOP = -1
 		)
+		ports := make([]int, 65535-1024)
+		for i := 1024; i < 65535; i++ {
+			ports[i-1024] = i
+		}
+		idx := 0
+		cnt := 0
 		v.AddState(START, "START", func(socket *SocketWrapper) int {
 			return SEND_SYN1
 		})
 		v.AddState(SEND_SYN1, "SEND_SYN1", func(socket *SocketWrapper) int {
 			// TODO: Port prediction attack
-
-			ports := make([]int, 65535-1024)
-			for i := 1024; i < 65535; i++ {
-				ports[i-1024] = i
+			cnt = (cnt + 1) % 3
+			if cnt == 0 {
+				idx = (idx + 1) % len(ports)
 			}
-			// rand.New(rand.NewSource(time.Now().UnixNano())).Shuffle(len(ports), func(i, j int) { ports[i], ports[j] = ports[j], ports[i] })
-			for _, port := range ports {
-				log.Info("Trying port: %d", port)
-				socket.udpSocket.WriteToUDP([]byte("SYN1"), &net.UDPAddr{
-					IP:   raddr.IP,
-					Port: port,
-				})
-				if port == socket.raddr.Port {
-					fmt.Printf("Found the port: %d\n", port)
-				}
-				time.Sleep(1 * time.Millisecond)
-			}
+			port := ports[idx]
+			time.Sleep(100 * time.Millisecond)
+			log.Info("Trying port: %d", port)
+			socket.udpSocket.WriteToUDP([]byte("SYN1"), &net.UDPAddr{
+				IP:   raddr.IP,
+				Port: port,
+			})
 			socket.udpSocket.SetReadDeadline(time.Now().Add(2 * time.Second))
 			n, addr, err := socket.udpSocket.ReadFromUDP(socket.cache)
 			if err != nil {
