@@ -38,11 +38,13 @@ do
     cp README.md ./release/build/$i-$j
     GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelClient cmd/client/pTunnelClient.go
     GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelServer cmd/server/pTunnelServer.go
+    GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelProxy cmd/proxy/pTunnelProxy.go
     GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelGenRSAKey cmd/genRSAKey/pTunnelGenRSAKey.go
     # check whether the os is windows, if yes, add .exe suffix
     if [ $i = "windows" ]; then
       mv ./release/build/$i-$j/pTunnelClient ./release/build/$i-$j/pTunnelClient.exe
       mv ./release/build/$i-$j/pTunnelServer ./release/build/$i-$j/pTunnelServer.exe
+      mv ./release/build/$i-$j/pTunnelProxy ./release/build/$i-$j/pTunnelProxy.exe
       mv ./release/build/$i-$j/pTunnelGenRSAKey ./release/build/$i-$j/pTunnelGenRSAKey.exe
     fi
     # compress the binary with zip and save it in ./release/packages
