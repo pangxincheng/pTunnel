@@ -3,28 +3,29 @@ package main
 import (
 	"errors"
 	"fmt"
-	"pTunnel/client"
+	"pTunnel/proxy"
 	"pTunnel/utils/common"
 	"strconv"
-	"strings"
 
 	"github.com/vaughan0/go-ini"
 )
 
-var usage = `pTunnelClient is the client application for the pTunnel.
+var usage = `pTunnelProxy is the p2p proxy for the pTunnel.
 Usage:
-	  pTunnelClient [options]
-	
+	pTunnelProxy [options]
+
 Options:
 	-h --help                              Show help information in screen.
 	-v --version                           Show version.
-	--config-file=<config-file>            Specify the config file path. [default: ./conf/client.ini]
+	--config-file=<config-file>            Specify the config file path. [default: ./conf/proxy.ini]
 	--public-key-file=<public-key-file>    Specify the public key file.
 	--nBits-file=<nBits-file>              Specify the NBits file.
 	--server-addr-v4=<server-addr-v4>      Specify the server ipv4 address.
 	--server-addr-v6=<server-addr-v6>      Specify the server ipv6 address.
 	--server-port=<server-port>            Specify the server port.
 	--server-type=<server-type>            Specify the server type. [options: tcp, tcp4, tcp6, kcp, kcp4, kcp6]
+	--proxy-port=<proxy-port>              Specify the proxy port.
+	--proxy-type=<proxy-type>              Specify the proxy type. [options: tcp, tcp4, tcp6, kcp, kcp4, kcp6]
 	--log-file=<log-level>                 Specify the path to the log file.
 	--log-level=<log-level>                Specify the log level. [options: debug, info, warning, error] [default: info]
 	--log-max-days=<log-max-days>          Specify the log max days.
@@ -46,7 +47,7 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			return fmt.Errorf("PublicKeyFile is not specified")
 		}
 	}
-	client.PublicKeyFile = args["--public-key-file"].(string)
+	proxy.PublicKeyFile = args["--public-key-file"].(string)
 
 	// NBitsFile
 	if args["--nBits-file"] == nil {
@@ -57,7 +58,7 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			return fmt.Errorf("NBitsFile is not specified")
 		}
 	}
-	client.NBitsFile = args["--nBits-file"].(string)
+	proxy.NBitsFile = args["--nBits-file"].(string)
 
 	// ServerAddrV4
 	if args["--server-addr-v4"] == nil {
@@ -69,7 +70,7 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			args["--server-addr-v4"] = ""
 		}
 	}
-	client.ServerAddrV4 = args["--server-addr-v4"].(string)
+	proxy.ServerAddrV4 = args["--server-addr-v4"].(string)
 
 	// ServerAddrV6
 	if args["--server-addr-v6"] == nil {
@@ -81,7 +82,7 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			args["--server-addr-v6"] = ""
 		}
 	}
-	client.ServerAddrV6 = args["--server-addr-v6"].(string)
+	proxy.ServerAddrV6 = args["--server-addr-v6"].(string)
 
 	// ServerPort
 	if args["--server-port"] == nil {
@@ -92,7 +93,7 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			return fmt.Errorf("ServerPort is not specified")
 		}
 	}
-	client.ServerPort, err = strconv.Atoi(args["--server-port"].(string))
+	proxy.ServerPort, err = strconv.Atoi(args["--server-port"].(string))
 	if err != nil {
 		return err
 	}
@@ -106,7 +107,7 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			return errors.New("ServerType is not specified")
 		}
 	}
-	client.ServerType = args["--server-type"].(string)
+	proxy.ServerType = args["--server-type"].(string)
 
 	// LogFile
 	if args["--log-file"] == nil {
@@ -117,11 +118,11 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			return errors.New("LogFile is not specified")
 		}
 	}
-	client.LogFile = args["--log-file"].(string)
-	if client.LogFile == "console" {
-		client.LogWay = "console"
+	proxy.LogFile = args["--log-file"].(string)
+	if proxy.LogFile == "console" {
+		proxy.LogWay = "console"
 	} else {
-		client.LogWay = "file"
+		proxy.LogWay = "file"
 	}
 
 	// LogLevel
@@ -133,7 +134,7 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			return errors.New("LogLevel is not specified")
 		}
 	}
-	client.LogLevel = args["--log-level"].(string)
+	proxy.LogLevel = args["--log-level"].(string)
 
 	// LogMaxDays
 	if args["--log-max-days"] == nil {
@@ -144,7 +145,7 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			return errors.New("LogMaxDays is not specified")
 		}
 	}
-	client.LogMaxDays, err = strconv.Atoi(args["--log-max-days"].(string))
+	proxy.LogMaxDays, err = strconv.Atoi(args["--log-max-days"].(string))
 	if err != nil {
 		return err
 	}
@@ -159,7 +160,7 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			args["--nat-type"] = "-1"
 		}
 	}
-	client.NatType, err = strconv.Atoi(args["--nat-type"].(string))
+	proxy.NatType, err = strconv.Atoi(args["--nat-type"].(string))
 	if err != nil {
 		return err
 	}
@@ -167,58 +168,33 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 	for k, v := range conf {
 		if k != "common" {
 			name := k
-			internalAddr := v["InternalAddr"]
-			internalPort, err := strconv.Atoi(v["InternalPort"])
+			proxyPort, err := strconv.Atoi(v["ProxyPort"])
 			if err != nil {
 				return err
 			}
-			internalType := v["InternalType"]
-			tunnelPort := 0
-			if _, ok := v["TunnelPort"]; ok {
-				tunnelPort, err = strconv.Atoi(v["TunnelPort"])
-				if err != nil {
-					return err
-				}
+			proxyType := v["ProxyType"]
+			tunnelPort, err := strconv.Atoi(v["TunnelPort"])
+			if err != nil {
+				return err
 			}
 			tunnelType := v["TunnelType"]
-			tunnelEncrypt, err := strconv.ParseBool(v["TunnelEncrypt"])
-			if err != nil {
-				return err
-			}
-			externalPort := tunnelPort
-			externalType := tunnelType
 			p2pAddrV4 := ""
 			p2pAddrV6 := ""
 			p2pPort := 0
-			if !strings.HasPrefix(strings.ToLower(tunnelType), "p2p") {
-				externalPort, err = strconv.Atoi(v["ExternalPort"])
+			if _, ok := v["P2PAddrV4"]; ok {
+				p2pAddrV4 = v["P2PAddrV4"]
+				p2pPort, err = strconv.Atoi(v["P2PPort"])
 				if err != nil {
 					return err
 				}
-				externalType = v["ExternalType"]
-			} else {
-				if _, ok := v["P2PAddrV4"]; ok {
-					p2pAddrV4 = v["P2PAddrV4"]
-					p2pPort, err = strconv.Atoi(v["P2PPort"])
-					if err != nil {
-						return err
-					}
-				}
-				if _, ok := v["P2PAddrV6"]; ok {
-					p2pAddrV6 = v["P2PAddrV6"]
-					p2pPort, err = strconv.Atoi(v["P2PPort"])
-					if err != nil {
-						return err
-					}
+			} else if _, ok := v["P2PAddrV6"]; ok {
+				p2pAddrV6 = v["P2PAddrV6"]
+				p2pPort, err = strconv.Atoi(v["P2PPort"])
+				if err != nil {
+					return err
 				}
 			}
-			client.RegisterService(
-				name,
-				internalAddr, internalPort, internalType,
-				externalPort, externalType,
-				tunnelPort, tunnelType, tunnelEncrypt,
-				p2pAddrV4, p2pAddrV6, p2pPort,
-			)
+			proxy.RegisterService(name, proxyPort, proxyType, tunnelPort, tunnelType, p2pAddrV4, p2pAddrV6, p2pPort)
 		}
 	}
 	return nil
@@ -239,12 +215,12 @@ func main() {
 	}
 
 	// Initialize conf
-	err = client.InitConf()
+	err = proxy.InitConf()
 	if err != nil {
 		fmt.Printf("Error during initializing configurations: %v\n", err)
 		return
 	}
 
-	// Start the client
-	client.Run()
+	// Start the proxy
+	proxy.Run()
 }

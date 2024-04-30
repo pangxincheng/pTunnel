@@ -3,12 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/docopt/docopt-go"
-	"github.com/vaughan0/go-ini"
-	"os"
 	"pTunnel/server"
-	"pTunnel/utils/version"
+	"pTunnel/utils/common"
 	"strconv"
+
+	"github.com/vaughan0/go-ini"
 )
 
 var usage = `pTunnelServer is the server application for the pTunnel.
@@ -17,32 +16,19 @@ Usage:
 
 Options:
 	-h --help                                Show help information in screen.
-	--version                                Show version.
-	-c --config-file=<config-file>           Specify the config file path. [default: ./conf/server.ini]
-	-s --server-port=<server-port>           Specify the server port.
-	-p --private-key-file=<private-key-file> Specify the private key file.
-	-n --nBits-file=<nBits-file>             Specify the NBits file.
-	-l --log-file=<log-level>                Specify the path to the log file.
+	-v --version                             Show version.
+	--config-file=<config-file>              Specify the config file path. [default: ./conf/server.ini]
+	--private-key-file=<private-key-file>    Specify the private key file.
+	--nBits-file=<nBits-file>                Specify the NBits file.
+	--server-type=<server-type>              Specify the server type. [options: tcp, tcp4, tcp6]
+	--server-port=<server-port>              Specify the server port.
+	--log-file=<log-level>                   Specify the path to the log file.
 	--log-level=<log-level>                  Specify the log level. [options: debug, info, warning, error]
 	--log-max-days=<log-max-days>            Specify the log max days.
 	--heartbeat-timeout=<heartbeat-timeout>  Specify the heartbeat timeout. 
 	--ssh-port=<ssh-port>                    Specify the ssh port.
 	--ssh-user=<ssh-user>                    Specify the ssh user.
-	--ssh-password=<ssh-password>            Specify the ssh password.
 `
-
-func ParseArgs() map[string]interface{} {
-	opts, err := docopt.ParseArgs(usage, os.Args[1:], version.GetVersion())
-	if err != nil {
-		fmt.Printf("Error during parsing arguments: %s\n", err.Error())
-		return nil
-	}
-	args := make(map[string]interface{})
-	for k, v := range opts {
-		args[k] = v
-	}
-	return args
-}
 
 func LoadConf(confFile string, args map[string]interface{}) error {
 	conf, err := ini.LoadFile(confFile)
@@ -71,6 +57,17 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		}
 	}
 	server.NBitsFile = args["--nBits-file"].(string)
+
+	// ServerType
+	if args["--server-type"] == nil {
+		tmpStr, ok := conf.Get("common", "ServerType")
+		if ok {
+			args["--server-type"] = tmpStr
+		} else {
+			return errors.New("ServerType is not specified")
+		}
+	}
+	server.ServerType = args["--server-type"].(string)
 
 	// ServerPort
 	if args["--server-port"] == nil {
@@ -123,6 +120,9 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		}
 	}
 	server.LogMaxDays, err = strconv.Atoi(args["--log-max-days"].(string))
+	if err != nil {
+		return err
+	}
 
 	// HeartbeatTimeout
 	if args["--heartbeat-timeout"] == nil {
@@ -134,6 +134,9 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		}
 	}
 	server.HeartbeatTimeout, err = strconv.Atoi(args["--heartbeat-timeout"].(string))
+	if err != nil {
+		return err
+	}
 
 	// SshPort
 	if args["--ssh-port"] == nil {
@@ -160,25 +163,17 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 	}
 	server.SshUser = args["--ssh-user"].(string)
 
-	// SshPassword
-	if args["--ssh-password"] == nil {
-		tmpStr, ok := conf.Get("common", "SshPassword")
-		if ok {
-			args["--ssh-password"] = tmpStr
-		} else {
-			args["--ssh-password"] = ""
-		}
-	}
-	server.SshPassword = args["--ssh-password"].(string)
-
 	return err
 }
 
 func main() {
 	// Parse arguments
-	args := ParseArgs()
+	args := common.ParseArgs(&usage)
+	if args == nil {
+		return
+	}
 
-	// Load configuration
+	// Load configuation
 	err := LoadConf(args["--config-file"].(string), args)
 	if err != nil {
 		fmt.Printf("Error during loading configurations: %v\n", err)

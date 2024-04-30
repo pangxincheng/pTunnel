@@ -1,4 +1,4 @@
-package client
+package proxy
 
 import (
 	"pTunnel/utils/common"
@@ -42,6 +42,7 @@ func InitConf() error {
 	if err != nil {
 		return err
 	}
+
 	if NatType != -1 {
 		MappingType = NatType / 3
 		FilteringType = NatType % 3

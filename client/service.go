@@ -1,11 +1,14 @@
 package client
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"pTunnel/conn"
 	tunnel2 "pTunnel/tunnel"
 	"pTunnel/utils/consts"
 	"pTunnel/utils/log"
+	"pTunnel/utils/p2p"
 	"pTunnel/utils/security"
 	"pTunnel/utils/serialize"
 	"strconv"
@@ -15,112 +18,47 @@ import (
 )
 
 type Service struct {
-	Name             string
-	SecretKey        []byte
-	InternalAddr     string
-	InternalPort     int
-	InternalType     string
-	ExternalPort     int
-	ExternalType     string
-	TunnelType       string
-	TunnelPort       int
-	TunnelEncrypt    bool
-	HeartbeatTimeout int
-	SshPort          int    // only for ssh tunnel
-	SshUser          string // only for ssh tunnel
-	SshPassword      string // only for ssh tunnel
+	Name             string // set mannually
+	InternalAddr     string // set mannually
+	InternalPort     int    // set mannually
+	InternalType     string // set mannually
+	ExternalPort     int    // set mannually
+	ExternalType     string // set mannually
+	TunnelPort       int    // set automatically/mannually
+	TunnelType       string // set mannually
+	TunnelEncrypt    bool   // set mannually
+	HeartbeatTimeout int    // set automatically
+	SshPort          int    // only for ssh tunnel, set automatically
+	SshUser          string // only for ssh tunnel, set automatically
+	P2PAddrV4        string // only for p2p tunnel, optional
+	P2PAddrV6        string // only for p2p tunnel, optional
+	P2PPort          int    // only for p2p tunnel, optional
 
-	ControlSocket  conn.Socket
-	ControlMsgChan chan int
-	TunnelMsgChan  chan int
+	SecretKey []byte // set automatically
+
+	ControlSocket  conn.Socket // set automatically
+	ControlMsgChan chan int    // set automatically
+	TunnelMsgChan  chan int    // set automatically
 }
 
 func (service *Service) run(wait *sync.WaitGroup) {
 	defer wait.Done()
 	log.Info("Service [%s] is running", service.Name)
 
+	// Create control socket
+	if service.createControlSocket() != nil {
+		return
+	}
+
 	// Generate SecretKey
 	service.SecretKey = security.AesGenKey(32)
 
-	// Construct metadata, serialize and encrypt
-	dict := make(map[string]interface{})
-	dict["SecretKey"] = string(service.SecretKey)
-	dict["ExternalPort"] = strconv.Itoa(service.ExternalPort)
-	dict["ExternalType"] = service.ExternalType
-	dict["TunnelType"] = service.TunnelType
-	dict["TunnelEncrypt"] = service.TunnelEncrypt
-	dict["TunnelPort"] = strconv.Itoa(service.TunnelPort)
-	bytes, err := serialize.Serialize(&dict)
-	if err != nil {
-		log.Error("Service [%s] serialize metadata failed. Error: %v", service.Name, err)
+	// Extract metadata
+	log.Info("Service [%s] is extracting metadata", service.Name)
+	if service.extractMetadata() != nil {
 		return
 	}
-	bytes, err = security.RSAEncryptBase64(bytes, PublicKey, NBits)
-	if err != nil {
-		log.Error("Service [%s] encrypt metadata failed. Error: %v", service.Name, err)
-		return
-	}
-
-	// Connect to the server
-	service.ControlSocket, err = conn.NewTCPSocket(ServerAddr, ServerPort)
-	if err != nil {
-		log.Error("Service [%s] connect to server failed. Error: %v", service.Name, err)
-		return
-	}
-
-	// Send metadata to the server
-	err = service.ControlSocket.WriteLine(bytes)
-	if err != nil {
-		log.Error("Service [%s] send metadata to server failed. Error: %v", service.Name, err)
-		return
-	}
-
-	// Receive response from the server, decrypt and deserialize
-	bytes, err = service.ControlSocket.ReadLine()
-	if err != nil {
-		log.Error("Service [%s] receive response from server failed. Error: %v", service.Name, err)
-		return
-	}
-	bytes, err = security.AESDecryptBase64(bytes, service.SecretKey)
-	if err != nil {
-		log.Error("Service [%s] decrypt response from server failed. Error: %v", service.Name, err)
-		return
-	}
-	dict = make(map[string]interface{})
-	err = serialize.Deserialize(bytes, &dict)
-	if err != nil {
-		log.Error("Service [%s] deserialize response from server failed. Error: %v", service.Name, err)
-		return
-	}
-	status, err := strconv.Atoi(dict["Status"].(string))
-	if err != nil {
-		log.Error("Service [%s] parse status from response failed. Error: %v", service.Name, err)
-		return
-	}
-	if status != 200 {
-		log.Error("Service [%s] response status is not 200. Status: %d", service.Name, status)
-		return
-	}
-	service.TunnelPort, err = strconv.Atoi(dict["TunnelPort"].(string))
-	if err != nil {
-		log.Error("Service [%s] parse tunnel port from response failed. Error: %v", service.Name, err)
-		return
-	}
-	service.HeartbeatTimeout, err = strconv.Atoi(dict["HeartbeatTimeout"].(string))
-	if err != nil {
-		log.Error("Service [%s] parse heartbeat timeout from response failed. Error: %v", service.Name, err)
-		return
-	}
-
-	service.SshPort, err = strconv.Atoi(dict["SshPort"].(string))
-	if err != nil {
-		log.Error("Service [%s] parse ssh port from response failed. Error: %v", service.Name, err)
-		return
-	}
-	service.SshUser = dict["SshUser"].(string)
-	service.SshPassword = dict["SshPassword"].(string)
-
-	log.Info("Service [%s] connect to server successfully. ExternalPort: %d, TunnelPort: %d, TunnelType: %s", service.Name, service.ExternalPort, service.TunnelPort, service.TunnelType)
+	log.Info("Service [%s] metadata extracted successfully", service.Name)
 
 	service.ControlMsgChan = make(chan int, 100)
 	service.TunnelMsgChan = make(chan int, 100)
@@ -138,11 +76,94 @@ func (service *Service) run(wait *sync.WaitGroup) {
 	service.controlMsgReader()
 }
 
+func (service *Service) createControlSocket() (err error) {
+	// Connect to server
+	service.ControlSocket, err = conn.NewSocket(
+		ServerType,
+		consts.Auto, consts.Auto, 0,
+		ServerAddrV4, ServerAddrV6, ServerPort,
+		consts.UnConf, nil,
+	)
+	if err != nil {
+		log.Error("Service [%s] connect to server failed. Error: %v", service.Name, err)
+	}
+	return
+}
+
+func (service *Service) extractMetadata() (err error) {
+	dict := make(map[string]interface{})
+	dict["SecretKey"] = string(service.SecretKey)
+	dict["ExternalPort"] = strconv.Itoa(service.ExternalPort)
+	dict["ExternalType"] = service.ExternalType
+	dict["TunnelPort"] = strconv.Itoa(service.TunnelPort)
+	dict["TunnelType"] = service.TunnelType
+	dict["TunnelEncrypt"] = service.TunnelEncrypt
+	bytes, err := serialize.Serialize(&dict)
+	if err != nil {
+		log.Error("Service [%s] serialize metadata failed. Error: %v", service.Name, err)
+		return
+	}
+	bytes, err = security.RSAEncryptBase64(bytes, PublicKey, NBits)
+	if err != nil {
+		log.Error("Service [%s] encrypt metadata failed. Error: %v", service.Name, err)
+		return
+	}
+
+	// Send metadata to the server
+	if err = service.ControlSocket.WriteLine(bytes); err != nil {
+		log.Error("Service [%s] send metadata failed. Error: %v", service.Name, err)
+		return
+	}
+
+	// Receive metadata from the server
+	bytes, err = service.ControlSocket.ReadLine()
+	if err != nil {
+		log.Error("Service [%s] receive metadata failed. Error: %v", service.Name, err)
+		return
+	}
+	bytes, err = security.AESDecryptBase64(bytes, service.SecretKey)
+	if err != nil {
+		log.Error("Service [%s] decrypt metadata failed. Error: %v", service.Name, err)
+		return
+	}
+	dict = make(map[string]interface{})
+	if err = serialize.Deserialize(bytes, &dict); err != nil {
+		log.Error("Service [%s] deserialize metadata failed. Error: %v", service.Name, err)
+		return
+	}
+	var status int
+	if status, err = strconv.Atoi(dict["Status"].(string)); err != nil || status != 200 {
+		log.Error("Service [%s] metadata status is not 200. Error: %v", service.Name, err)
+		return
+	}
+	service.TunnelPort, err = strconv.Atoi(dict["TunnelPort"].(string))
+	if err != nil {
+		log.Error("Service [%s] extract tunnel port failed. Error: %v", service.Name, err)
+		return
+	}
+	service.HeartbeatTimeout, err = strconv.Atoi(dict["HeartbeatTimeout"].(string))
+	if err != nil {
+		log.Error("Service [%s] extract heartbeat timeout failed. Error: %v", service.Name, err)
+		return
+	}
+	if service.TunnelType == "ssh" {
+		service.SshPort, err = strconv.Atoi(dict["SshPort"].(string))
+		if err != nil || service.SshPort == 0 {
+			log.Error("Service [%s] extract ssh port failed. Error: %v", service.Name, err)
+			return
+		}
+		service.SshUser = dict["SshUser"].(string)
+	}
+
+	log.Info("Service [%s] metadata extracted successfully", service.Name)
+	return
+}
+
 func (service *Service) heartBeatCreator() {
 	log.Info("Service [%s] heartbeat sender is running", service.Name)
 	for {
 		time.Sleep(time.Duration(service.HeartbeatTimeout/2) * time.Second)
-		service.ControlMsgChan <- consts.HeartBeat
+		service.ControlMsgChan <- consts.Heartbeat
 	}
 }
 
@@ -169,78 +190,48 @@ func (service *Service) controlMsgSender() {
 }
 
 func (service *Service) tunnelCreator() {
-
 	log.Info("Service [%s] tunnel manager is running", service.Name)
 	for {
 		_ = <-service.TunnelMsgChan
-		var tunnel conn.Socket
-		var client conn.Socket
-		var err error
-		if strings.ToLower(service.TunnelType) == "tcp" {
-			tunnel, err = conn.NewTCPSocket(ServerAddr, service.TunnelPort)
-			if err != nil {
-				log.Error("Service [%s] create tunnel failed. Error: %v", service.Name, err)
-				continue
-			}
-		} else if strings.ToLower(service.TunnelType) == "kcp" {
-			tunnel, err = conn.NewKCPSocket(ServerAddr, service.TunnelPort)
-			if err != nil {
-				log.Error("Service [%s] create tunnel failed. Error: %v", service.Name, err)
-				continue
-			}
-		} else if strings.ToLower(service.TunnelType) == "udp" {
-			log.Error("Service [%s] udp tunnel is not supported", service.Name)
-			continue
-			//tunnel, err = conn.NewUDPSocket(ServerAddr, service.TunnelPort)
-			//if err != nil {
-			//	log.Error("Service [%s] create tunnel failed. Error: %v", service.Name, err)
-			//	continue
-			//}
-		} else if strings.ToLower(service.TunnelType) == "ssh" {
-			tunnel, err = conn.NewSSHSocket(ServerAddr, service.TunnelPort, service.SshPort, service.SshUser, service.SshPassword)
-			if err != nil {
-				log.Error("Service [%s] create tunnel failed. Error: %v", service.Name, err)
-				continue
-			}
-		} else {
-			log.Error("Service [%s] unknown tunnel type: %s", service.Name, service.TunnelType)
+		socketType := service.TunnelType
+		if service.TunnelType == "p2p6" {
+			socketType = "kcp6"
+		} else if service.TunnelType == "p2p4" {
+			socketType = "kcp4"
+		}
+		tunnel, err := conn.NewSocket(
+			socketType,
+			consts.Auto, consts.Auto, 0,
+			ServerAddrV4, ServerAddrV6,
+			service.TunnelPort, consts.UnConf, nil,
+		)
+		if err != nil {
+			log.Error("Service [%s] create a new tunnel failed. Error: %v", service.Name, err)
 			continue
 		}
-
-		if strings.ToLower(service.InternalType) == "tcp" {
-			client, err = conn.NewTCPSocket(service.InternalAddr, service.InternalPort)
+		if !strings.HasPrefix(strings.ToLower(service.TunnelType), "p2p") {
+			client, err := conn.NewSocket(
+				service.InternalType,
+				consts.Auto, consts.Auto, 0,
+				service.InternalAddr, service.InternalAddr,
+				service.InternalPort, consts.UnConf, nil,
+			)
 			if err != nil {
-				log.Error("Service [%s] connect to internal service failed. Error: %v", service.Name, err)
+				tunnel.Close()
+				log.Error("Service [%s] create a new client failed. Error: %v", service.Name, err)
 				continue
 			}
-		} else if strings.ToLower(service.InternalType) == "udp" {
-			log.Error("Service [%s] udp internal service is not supported", service.Name)
-			continue
-			//client, err = conn.NewUDPSocket(service.InternalAddr, service.InternalPort)
-			//if err != nil {
-			//	log.Error("Service [%s] connect to internal service failed. Error: %v", service.Name, err)
-			//	continue
-			//}
+			go service.tunnel(client, tunnel, &service.SecretKey)
 		} else {
-			log.Error("Service [%s] unknown internal type: %s", service.Name, service.InternalType)
-			continue
+			go service.p2pTunnel(tunnel)
 		}
-
-		// create a net tunnel to process the request
-		go service.tunnel(client, tunnel)
 	}
 }
 
-func (service *Service) tunnel(client conn.Socket, tunnel conn.Socket) {
-	closeFn := func(tunnel conn.Socket) {
-		err := tunnel.Close()
-		if err != nil {
-			log.Error("Service [%s] close a tunnel failed. Error: %v", service.Name, err)
-		}
-	}
-	defer closeFn(tunnel)
-	defer closeFn(client)
-	if !tunnel2.ClientTunnelSafetyCheck(tunnel, service.SecretKey) {
+func (service *Service) tunnel(client conn.Socket, tunnel conn.Socket, secretKey *[]byte) {
+	defer tunnel.Close()
+	defer client.Close()
+	if !tunnel2.ClientTunnelSafetyCheck(tunnel, *secretKey) {
 		log.Error("Tunnel safety check failed")
 		return
 	}
@@ -248,8 +239,141 @@ func (service *Service) tunnel(client conn.Socket, tunnel conn.Socket) {
 		tunnel2.UnsafeTunnel(client, tunnel)
 		return
 	} else {
-		tunnel2.SafeTunnel(client, tunnel, service.SecretKey)
+		tunnel2.SafeTunnel(client, tunnel, *secretKey)
 	}
+}
+
+func (service *Service) p2pTunnel(tunnel conn.Socket) {
+	var RAddr *net.UDPAddr
+	var LAddr *net.UDPAddr
+	var FSMType string
+	var SecretKey []byte
+
+	extractMetadata := func() (err error) {
+		secretKey := security.AesGenKey(32)
+		dict := make(map[string]interface{})
+		if service.P2PAddrV4 != "" {
+			dict["Addr"] = service.P2PAddrV4
+			dict["Port"] = strconv.Itoa(service.P2PPort)
+			dict["Network"] = "udp4"
+		} else if service.P2PAddrV6 != "" {
+			dict["Addr"] = service.P2PAddrV6
+			dict["Port"] = strconv.Itoa(service.P2PPort)
+			dict["Network"] = "udp6"
+		}
+		dict["Type"] = "Client"
+		dict["NATType"] = strconv.Itoa(MappingType*3 + FilteringType)
+		dict["SecretKey"] = string(secretKey)
+		bytes, err := serialize.Serialize(&dict)
+		if err != nil {
+			log.Error("Service [%s] serialize metadata failed. Error: %v", service.Name, err)
+			return
+		}
+		bytes, err = security.RSAEncryptBase64(bytes, PublicKey, NBits)
+		if err != nil {
+			log.Error("Service [%s] encrypt metadata failed. Error: %v", service.Name, err)
+			return
+		}
+		if err = tunnel.WriteLine(bytes); err != nil {
+			log.Error("Service [%s] send metadata failed. Error: %v", service.Name, err)
+			return
+		}
+
+		bytes, err = tunnel.ReadLine()
+		if err != nil {
+			log.Error("Service [%s] receive metadata failed. Error: %v", service.Name, err)
+			return
+		}
+
+		bytes, err = security.AESDecryptBase64(bytes, secretKey)
+		if err != nil {
+			log.Error("Service [%s] decrypt metadata failed. Error: %v", service.Name, err)
+			return
+		}
+
+		dict = make(map[string]interface{})
+		err = serialize.Deserialize(bytes, &dict)
+		if err != nil {
+			log.Error("Service [%s] deserialize metadata failed. Error: %v", service.Name, err)
+			return
+		}
+
+		RAddr, err = net.ResolveUDPAddr(dict["RNetwork"].(string), fmt.Sprintf("%s:%s", dict["RAddr"].(string), dict["RPort"].(string)))
+		if err != nil {
+			log.Error("Service [%s] resolve remote address failed. Error: %v", service.Name, err)
+			return
+		}
+		if service.P2PAddrV4 != "" {
+			LAddr, err = net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%s", service.P2PAddrV4, strconv.Itoa(service.P2PPort)))
+		} else if service.P2PAddrV6 != "" {
+			LAddr, err = net.ResolveUDPAddr("udp6", fmt.Sprintf("%s:%s", service.P2PAddrV6, strconv.Itoa(service.P2PPort)))
+		} else if service.TunnelType == "p2p4" {
+			LAddr, err = net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%s", "0.0.0.0", strconv.Itoa(service.TunnelPort)))
+		} else if service.TunnelType == "p2p6" {
+			LAddr, err = net.ResolveUDPAddr("udp6", fmt.Sprintf("%s:%s", "[::]", strconv.Itoa(service.TunnelPort)))
+		}
+		if err != nil {
+			log.Error("Resolve local address failed. Error: %v", err)
+			return
+		}
+		FSMType = dict["FSMType"].(string)
+		SecretKey = []byte(dict["SecretKey"].(string))
+		return
+	}
+
+	closeTunnelSocket := func() {
+		if tunnel != nil {
+			tunnel.Close()
+		}
+		tunnel = nil
+	}
+
+	udpHolePunching := func() (err error) {
+		fsmFn := p2p.GetFSM(FSMType)
+		if fsmFn == nil {
+			log.Error("Service [%s] get FSM failed", service.Name)
+			err = errors.New("unsupported FSM type")
+			return
+		}
+		fsm := fsmFn(LAddr, RAddr)
+		if fsm == nil {
+			log.Error("Service [%s] create FSM failed", service.Name)
+			err = errors.New("create FSM failed")
+			return
+		}
+		if fsm.Run(1) != 0 {
+			log.Error("Service [%s] run FSM failed", service.Name)
+			err = errors.New("run FSM failed")
+			return
+		}
+		log.Info("Service [%s] UDP hole punching success", service.Name)
+		tunnel = fsm.GetKCPSocket()
+		return
+	}
+
+	defer closeTunnelSocket()
+
+	if extractMetadata() != nil {
+		return
+	}
+
+	closeTunnelSocket()
+
+	if udpHolePunching() != nil {
+		return
+	}
+
+	client, err := conn.NewSocket(
+		service.InternalType,
+		consts.Auto, consts.Auto, 0,
+		service.InternalAddr, service.InternalAddr,
+		service.InternalPort, consts.UnConf, nil,
+	)
+	if err != nil {
+		log.Error("Service [%s] create a new client failed. Error: %v", service.Name, err)
+		return
+	}
+	service.tunnel(client, tunnel, &SecretKey)
 }
 
 func (service *Service) controlMsgReader() {
@@ -280,7 +404,7 @@ func (service *Service) controlMsgReader() {
 			break
 		}
 		switch msg {
-		case consts.HeartBeat:
+		case consts.Heartbeat:
 			timer.Reset(time.Duration(service.HeartbeatTimeout) * time.Second)
 		case consts.CreateTunnel:
 			service.TunnelMsgChan <- consts.CreateTunnel
@@ -293,7 +417,6 @@ func (service *Service) controlMsgReader() {
 
 var services = make(map[string]*Service)
 
-// RegisterService register a new service
 func RegisterService(
 	name string,
 	internalAddr string,
@@ -304,7 +427,13 @@ func RegisterService(
 	tunnelPort int,
 	tunnelType string,
 	tunnelEncrypt bool,
+	p2pAddrV4 string,
+	p2pAddrV6 string,
+	p2pPort int,
 ) {
+	if _, ok := services[name]; ok {
+		panic("service already exists")
+	}
 	services[name] = &Service{
 		Name:          name,
 		InternalAddr:  internalAddr,
@@ -315,12 +444,14 @@ func RegisterService(
 		TunnelPort:    tunnelPort,
 		TunnelType:    tunnelType,
 		TunnelEncrypt: tunnelEncrypt,
+		P2PAddrV4:     p2pAddrV4,
+		P2PAddrV6:     p2pAddrV6,
+		P2PPort:       p2pPort,
 	}
 }
 
-// Run start all services
 func Run() {
-	log.InitLog(LogWay, LogFile, LogLevel, LogMaxDays)
+	log.InitLog(LogFile, LogWay, LogLevel, LogMaxDays)
 	var wait sync.WaitGroup
 	wait.Add(len(services))
 	for _, service := range services {
