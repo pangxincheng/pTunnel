@@ -150,6 +150,21 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		return err
 	}
 
+	// NatType
+	if args["--nat-type"] == nil {
+		tmpStr, ok := conf.Get("common", "NatType")
+		if ok {
+			args["--nat-type"] = tmpStr
+		} else {
+			fmt.Println("NatType is not specified, set to -1")
+			args["--nat-type"] = "-1"
+		}
+	}
+	proxy.NatType, err = strconv.Atoi(args["--nat-type"].(string))
+	if err != nil {
+		return err
+	}
+
 	for k, v := range conf {
 		if k != "common" {
 			name := k
