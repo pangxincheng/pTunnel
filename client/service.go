@@ -318,7 +318,6 @@ func (service *Service) p2pTunnel(tunnel conn.Socket) {
 		}
 		FSMType = dict["FSMType"].(string)
 		SecretKey = []byte(dict["SecretKey"].(string))
-		fmt.Println(string(secretKey), " ", string(SecretKey))
 		return
 	}
 
@@ -374,7 +373,7 @@ func (service *Service) p2pTunnel(tunnel conn.Socket) {
 		log.Error("Service [%s] create a new client failed. Error: %v", service.Name, err)
 		return
 	}
-	go service.tunnel(client, tunnel, &SecretKey)
+	service.tunnel(client, tunnel, &SecretKey)
 }
 
 func (service *Service) controlMsgReader() {
