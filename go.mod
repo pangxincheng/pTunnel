@@ -10,7 +10,7 @@ require (
 	github.com/thanhpk/randstr v1.0.6
 	github.com/vaughan0/go-ini v0.0.0-20130923145212-a98ad7ee00ec
 	github.com/xtaci/kcp-go/v5 v5.6.8
-	golang.org/x/crypto v0.17.0
+	golang.org/x/crypto v0.21.0
 )
 
 require (
