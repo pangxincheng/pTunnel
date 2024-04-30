@@ -24,6 +24,7 @@ type Service struct {
 	P2PAddrV4  string // only for p2p tunnel, optional
 	P2PAddrV6  string // only for p2p tunnel, optional
 	P2PPort    int    // only for p2p tunnel, optional
+	P2PType    string // only for p2p tunnel, optional
 
 	ProxySocket  conn.Socket // set automatically
 	TunnelSocket conn.Socket // set automatically
@@ -85,11 +86,11 @@ func (service *Service) createTunnelSocket() (err error) {
 func (service *Service) extractMetadata() (err error) {
 	secretKey := security.AesGenKey(32) // only for encrypt/decrypt metadata
 	dict := make(map[string]interface{})
-	if service.TunnelType == "p2p4" && service.P2PAddrV4 != "" {
+	if service.P2PAddrV4 != "" {
 		dict["Addr"] = service.P2PAddrV4
 		dict["Port"] = strconv.Itoa(service.P2PPort)
 		dict["Network"] = "udp4"
-	} else if service.TunnelType == "p2p6" && service.P2PAddrV6 != "" {
+	} else if service.P2PAddrV6 != "" {
 		dict["Addr"] = service.P2PAddrV6
 		dict["Port"] = strconv.Itoa(service.P2PPort)
 		dict["Network"] = "udp6"
@@ -137,18 +138,18 @@ func (service *Service) extractMetadata() (err error) {
 		log.Error("Resolve remote address failed. Error: %v", err)
 		return
 	}
-	if service.TunnelType == "p2p4" {
-		if service.P2PAddrV4 == "" {
-			service.LAddr, err = net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%s", "0.0.0.0", strconv.Itoa(service.TunnelPort)))
-		} else {
-			service.LAddr, err = net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%s", service.P2PAddrV4, strconv.Itoa(service.P2PPort)))
-		}
+	if service.P2PAddrV4 != "" {
+		service.LAddr, err = net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%s", service.P2PAddrV4, strconv.Itoa(service.P2PPort)))
+	} else if service.P2PAddrV6 != "" {
+		service.LAddr, err = net.ResolveUDPAddr("udp6", fmt.Sprintf("%s:%s", service.P2PAddrV6, strconv.Itoa(service.P2PPort)))
+	} else if service.TunnelType == "p2p4" {
+		service.LAddr, err = net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%s", "0.0.0.0", strconv.Itoa(service.TunnelPort)))
 	} else if service.TunnelType == "p2p6" {
-		if service.P2PAddrV6 == "" {
-			service.LAddr, err = net.ResolveUDPAddr("udp6", fmt.Sprintf("%s:%s", "[::]", strconv.Itoa(service.TunnelPort)))
-		} else {
-			service.LAddr, err = net.ResolveUDPAddr("udp6", fmt.Sprintf("%s:%s", service.P2PAddrV6, strconv.Itoa(service.P2PPort)))
-		}
+		service.LAddr, err = net.ResolveUDPAddr("udp6", fmt.Sprintf("%s:%s", "[::]", strconv.Itoa(service.TunnelPort)))
+	}
+	if err != nil {
+		log.Error("Resolve local address failed. Error: %v", err)
+		return
 	}
 	service.FSMType = dict["FSMType"].(string)
 	service.SecretKey = []byte(dict["SecretKey"].(string)) // tunnel secret key
@@ -258,4 +259,5 @@ func Run() {
 			}
 		}(service)
 	}
+	wait.Wait()
 }

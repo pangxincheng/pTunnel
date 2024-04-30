@@ -172,8 +172,7 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 				if err != nil {
 					return err
 				}
-			}
-			if _, ok := v["P2PAddrV6"]; ok {
+			} else if _, ok := v["P2PAddrV6"]; ok {
 				p2pAddrV6 = v["P2PAddrV6"]
 				p2pPort, err = strconv.Atoi(v["P2PPort"])
 				if err != nil {
