@@ -35,9 +35,9 @@ NatType = -1
 
 [ssh]
 ; 要内网穿透的服务器的ip地址(ipv4/ipv6)
-InternalAddr = 183.174.229.137
+InternalAddr = 127.0.0.1
 ; 要内网穿透的服务器的端口
-InternalPort = 5102
+InternalPort = 22
 ; 要内网穿透的服务器的类型, 支持tcp4/tcp6/kcp4/kcp6
 InternalType = tcp4
 ; 指定建立的隧道在服务器上希望监听的端口, 0表示随机
