@@ -1,12 +1,49 @@
 [common]
-; The proxy only will be used in the p2p tunnel mode.
-; So the proxy will build a kcpsocket to connect to the ServerAddr:ServerPort.
-ServerAddr = 175.24.94.35
-ServerPort = 7890
-; if you specify the P2pAddr, the p2p server will send it to the client.
-P2pAddr = [fe80::215:5dff:fec9:5063]:1234
+; 服务器公钥文件
 PublicKeyFile = cert/PublicKey.pem
+; 服务器公钥长度文件
 NBitsFile = cert/NBits.txt
+; 服务器的ipv4地址
+ServerAddrV4 = localhost
+; 服务器的ipv6地址
+ServerAddrV6 = ip6-localhost
+; 服务器的监听端口
+ServerPort = 7000
+; 服务器类型, 支持tcp4/tcp6/kcp4/kcp6, 此处必须与服务器的ServerType一致(例如: 服务器的ServerType为tcp, 则此处必须为tcp4/tcp6)
+; 注意: 如果使用tcp4/kcp4, 则必须指定服务器的ipv4地址ServerAddrV4, 如果使用tcp6/kcp6, 则必须指定服务器的ipv6地址ServerAddrV6
+ServerType = tcp6
+; 日志文件, console表示输出到控制台
 LogFile = console
+; 日志级别, 支持debug/info/warn/error
 LogLevel = info
+; 日志最大保留天数
 LogMaxDays = 3
+; 代理服务器类型, 支持tcp/kcp
+ProxyType = tcp
+; 代理服务器监听端口
+ProxyPort = 5102
+; 隧道的端口, 该端口需要被服务器监听, 而且应该和内网的Client中的TunnelPort一致
+; (如果内网的Client中的TunnelPort为0, 则此处也应该为服务器为其分配的端口号)
+TunnelPort = 35875
+; 隧道的类型, 支持p2p4/p2p6, 需要该TunnelPort上的服务是p2p隧道
+TunnelType = p2p4
+
+; 如果想要显式指定p2p的公网地址, 则可以在此处(P2PAddrAndPortV4/P2PAddrAndPortV6)和P2PPort指定
+; 否则将使用UDP打洞来获取公网地址
+; P2PAddrV4 = 10.42.0.16
+; P2pAddrV6 = [fe80::f0d1:1e0d:1e0d:1e0d]
+; P2PPort = 48532
+
+; Nat的类型, 支持[-1, 0, 1, 2, 3, 4, 5, 6, 7, 8]
+; 不指定则为-1, 会自动检测
+; -1: 未知, 自动检测
+; 其他NatType = MappingType * 3 + FilteringType
+; MappingType: 
+;     0: Endpoint-Independent Mapping
+;     1: Address-Dependent Mapping
+;     2: Address-and-Port-Dependent Mapping
+; FilteringType: 
+;     0: Endpoint-Independent Filtering
+;     1: Address-Dependent Filtering
+;     2: Address-and-Port-Dependent Filtering
+NatType = -1

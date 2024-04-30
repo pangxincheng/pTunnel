@@ -106,13 +106,13 @@ var fsmType2Func = map[string]FsmFn{
 			return SEND_SYN2
 		})
 		v.AddState(CREATE_KCP_LISTENER, "CREATE_KCP_LISTENER", func(socket *SocketWrapper) int {
-			listener, err := conn.NewKCPListenerV2(socket.laddr)
+			listener, err := conn.NewKCPListener(socket.laddr)
 			if err != nil {
 				fmt.Printf("Failed to create KCP listener. Error: %v\n", err)
 				return ERR_STOP
 			}
 			socket.kcpListener = listener.(*conn.KCPListener)
-			socket.kcpListener.Listener().SetDeadline(time.Now().Add(2 * time.Second))
+			socket.kcpListener.Listener.SetDeadline(time.Now().Add(2 * time.Second))
 			kcpSocket, err := socket.kcpListener.AcceptKCP()
 			if err != nil {
 				fmt.Printf("Failed to accept KCP connection. Error: %v\n", err)
@@ -177,7 +177,7 @@ var fsmType2Func = map[string]FsmFn{
 			return CREATE_KCP_SOCKET
 		})
 		v.AddState(CREATE_KCP_SOCKET, "CREATE_KCP_SOCKET", func(socket *SocketWrapper) int {
-			kcpSocket, err := conn.NewKCPSocketV2(socket.laddr, socket.raddr)
+			kcpSocket, err := conn.NewKCPSocket(socket.laddr, socket.raddr, "udp")
 			if err != nil {
 				fmt.Printf("Failed to create KCP socket. Error: %v\n", err)
 				return KILL_KCP_SOCKET
@@ -200,7 +200,7 @@ var fsmType2Func = map[string]FsmFn{
 			return RECV_HEARTBEAT
 		})
 		v.AddState(RECV_HEARTBEAT, "RECV_HEARTBEAT", func(socket *SocketWrapper) int {
-			socket.kcpSocket.GetSocket().SetReadDeadline(time.Now().Add(2 * time.Second))
+			socket.kcpSocket.Socket.SetReadDeadline(time.Now().Add(2 * time.Second))
 			bytes, err := socket.kcpSocket.ReadLine()
 			if err != nil {
 				fmt.Printf("Failed to read line. Error: %v\n", err)
@@ -256,13 +256,13 @@ var fsmType2Func = map[string]FsmFn{
 			return CREATE_KCP_LISTENER
 		})
 		v.AddState(CREATE_KCP_LISTENER, "CREATE_KCP_LISTENER", func(socket *SocketWrapper) int {
-			listener, err := conn.NewKCPListenerV2(socket.laddr)
+			listener, err := conn.NewKCPListener(socket.laddr)
 			if err != nil {
 				fmt.Printf("Failed to create KCP listener. Error: %v\n", err)
 				return KILL_KCP_LISTENER
 			}
 			socket.kcpListener = listener.(*conn.KCPListener)
-			socket.kcpListener.Listener().SetDeadline(time.Now().Add(2 * time.Second))
+			socket.kcpListener.Listener.SetDeadline(time.Now().Add(2 * time.Second))
 			kcpSocket, err := socket.kcpListener.AcceptKCP()
 			if err != nil {
 				fmt.Printf("Failed to accept KCP connection. Error: %v\n", err)
@@ -337,7 +337,7 @@ var fsmType2Func = map[string]FsmFn{
 			return CREATE_KCP_SOCKET
 		})
 		v.AddState(CREATE_KCP_SOCKET, "CREATE_KCP_SOCKET", func(socket *SocketWrapper) int {
-			kcpSocket, err := conn.NewKCPSocketV2(socket.laddr, socket.raddr)
+			kcpSocket, err := conn.NewKCPSocket(socket.laddr, socket.raddr, "udp")
 			if err != nil {
 				fmt.Printf("Failed to create KCP socket. Error: %v\n", err)
 				return KILL_KCP_SOCKET
@@ -361,7 +361,7 @@ var fsmType2Func = map[string]FsmFn{
 			return RECV_HEARTBEAT
 		})
 		v.AddState(RECV_HEARTBEAT, "RECV_HEARTBEAT", func(socket *SocketWrapper) int {
-			socket.kcpSocket.GetSocket().SetReadDeadline(time.Now().Add(2 * time.Second))
+			socket.kcpSocket.Socket.SetReadDeadline(time.Now().Add(2 * time.Second))
 			bytes, err := socket.kcpSocket.ReadLine()
 			if err != nil {
 				fmt.Printf("Failed to read line. Error: %v\n", err)
@@ -436,13 +436,13 @@ var fsmType2Func = map[string]FsmFn{
 			return CREATE_KCP_LISTENER
 		})
 		v.AddState(CREATE_KCP_LISTENER, "CREATE_KCP_LISTENER", func(socket *SocketWrapper) int {
-			listener, err := conn.NewKCPListenerV2(socket.laddr)
+			listener, err := conn.NewKCPListener(socket.laddr)
 			if err != nil {
 				fmt.Printf("Failed to create KCP listener. Error: %v\n", err)
 				return KILL_KCP_LISTENER
 			}
 			socket.kcpListener = listener.(*conn.KCPListener)
-			socket.kcpListener.Listener().SetDeadline(time.Now().Add(2 * time.Second))
+			socket.kcpListener.Listener.SetDeadline(time.Now().Add(2 * time.Second))
 			kcpSocket, err := socket.kcpListener.AcceptKCP()
 			if err != nil {
 				fmt.Printf("Failed to accept KCP connection. Error: %v\n", err)
@@ -517,7 +517,7 @@ var fsmType2Func = map[string]FsmFn{
 			return CREATE_KCP_SOCKET
 		})
 		v.AddState(CREATE_KCP_SOCKET, "CREATE_KCP_SOCKET", func(socket *SocketWrapper) int {
-			kcpSocket, err := conn.NewKCPSocketV2(socket.laddr, socket.raddr)
+			kcpSocket, err := conn.NewKCPSocket(socket.laddr, socket.raddr, "udp")
 			if err != nil {
 				fmt.Printf("Failed to create KCP socket. Error: %v\n", err)
 				return KILL_KCP_SOCKET
@@ -541,7 +541,7 @@ var fsmType2Func = map[string]FsmFn{
 			return RECV_HEARTBEAT
 		})
 		v.AddState(RECV_HEARTBEAT, "RECV_HEARTBEAT", func(socket *SocketWrapper) int {
-			socket.kcpSocket.GetSocket().SetReadDeadline(time.Now().Add(2 * time.Second))
+			socket.kcpSocket.Socket.SetReadDeadline(time.Now().Add(2 * time.Second))
 			bytes, err := socket.kcpSocket.ReadLine()
 			if err != nil {
 				fmt.Printf("Failed to read line. Error: %v\n", err)

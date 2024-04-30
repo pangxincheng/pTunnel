@@ -1,6 +1,11 @@
 package consts
 
 const (
-	HeartBeat = iota
+	Heartbeat = iota
 	CreateTunnel
+)
+
+const (
+	UnConf = "[unconf]"
+	Auto   = "[auto]"
 )

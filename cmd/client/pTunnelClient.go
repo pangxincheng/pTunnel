@@ -3,47 +3,33 @@ package main
 import (
 	"errors"
 	"fmt"
-	"os"
 	"pTunnel/client"
-	"pTunnel/utils/version"
+	"pTunnel/utils/common"
 	"strconv"
 	"strings"
 
-	"github.com/docopt/docopt-go"
 	"github.com/vaughan0/go-ini"
 )
 
 var usage = `pTunnelClient is the client application for the pTunnel.
 Usage:
-	pTunnelClient [options]
-
+	  pTunnelClient [options]
+	
 Options:
 	-h --help                              Show help information in screen.
-	--version                              Show version.
-	-c --config-file=<config-file>         Specify the config file path. [default: ./conf/client.ini]
+	-v --version                           Show version.
+	--config-file=<config-file>            Specify the config file path. [default: ./conf/client.ini]
+	--public-key-file=<public-key-file>    Specify the public key file.
+	--nBits-file=<nBits-file>              Specify the NBits file.
 	--server-addr-v4=<server-addr-v4>      Specify the server ipv4 address.
 	--server-addr-v6=<server-addr-v6>      Specify the server ipv6 address.
 	--server-port=<server-port>            Specify the server port.
-	-p --public-key-file=<public-key-file> Specify the public key file.
-	-n --nBits-file=<nBits-file>           Specify the NBits file.
-	-l --log-file=<log-level>              Specify the path to the log file.
+	--server-type=<server-type>            Specify the server type. [options: tcp, tcp4, tcp6, kcp, kcp4, kcp6]
+	--log-file=<log-level>                 Specify the path to the log file.
 	--log-level=<log-level>                Specify the log level. [options: debug, info, warning, error] [default: info]
 	--log-max-days=<log-max-days>          Specify the log max days.
 	--nat-type=<nat-type>                  Specify the NAT type. [options: 0, 1, 2, 3, 4, 5, 6, 7, 8]
 `
-
-func ParseArgs() map[string]interface{} {
-	opts, err := docopt.ParseArgs(usage, os.Args[1:], version.GetVersion())
-	if err != nil {
-		fmt.Printf("Error during parsing arguments: %s\n", err.Error())
-		return nil
-	}
-	args := make(map[string]interface{})
-	for k, v := range opts {
-		args[k] = v
-	}
-	return args
-}
 
 func LoadConf(confFile string, args map[string]interface{}) error {
 	conf, err := ini.LoadFile(confFile)
@@ -57,7 +43,7 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		if ok {
 			args["--public-key-file"] = tmpStr
 		} else {
-			return errors.New("PublicKeyFile is not specified")
+			return fmt.Errorf("PublicKeyFile is not specified")
 		}
 	}
 	client.PublicKeyFile = args["--public-key-file"].(string)
@@ -68,7 +54,7 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		if ok {
 			args["--nBits-file"] = tmpStr
 		} else {
-			return errors.New("NBitsFile is not specified")
+			return fmt.Errorf("NBitsFile is not specified")
 		}
 	}
 	client.NBitsFile = args["--nBits-file"].(string)
@@ -79,7 +65,8 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		if ok {
 			args["--server-addr-v4"] = tmpStr
 		} else {
-			return errors.New("ServerAddr is not specified")
+			fmt.Println("ServerAddrV4 is not specified, set to \"\"")
+			args["--server-addr-v4"] = ""
 		}
 	}
 	client.ServerAddrV4 = args["--server-addr-v4"].(string)
@@ -90,10 +77,25 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		if ok {
 			args["--server-addr-v6"] = tmpStr
 		} else {
+			fmt.Println("ServerAddrV6 is not specified, set to \"\"")
 			args["--server-addr-v6"] = ""
 		}
 	}
 	client.ServerAddrV6 = args["--server-addr-v6"].(string)
+
+	// ServerPort
+	if args["--server-port"] == nil {
+		tmpStr, ok := conf.Get("common", "ServerPort")
+		if ok {
+			args["--server-port"] = tmpStr
+		} else {
+			return fmt.Errorf("ServerPort is not specified")
+		}
+	}
+	client.ServerPort, err = strconv.Atoi(args["--server-port"].(string))
+	if err != nil {
+		return err
+	}
 
 	// ServerType
 	if args["--server-type"] == nil {
@@ -105,20 +107,6 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		}
 	}
 	client.ServerType = args["--server-type"].(string)
-
-	// ServerPort
-	if args["--server-port"] == nil {
-		tmpStr, ok := conf.Get("common", "ServerPort")
-		if ok {
-			args["--server-port"] = tmpStr
-		} else {
-			return errors.New("ServerPort is not specified")
-		}
-	}
-	client.ServerPort, err = strconv.Atoi(args["--server-port"].(string))
-	if err != nil {
-		return err
-	}
 
 	// LogFile
 	if args["--log-file"] == nil {
@@ -161,21 +149,21 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		return err
 	}
 
-	// NATType
+	// NatType
 	if args["--nat-type"] == nil {
-		tmpStr, ok := conf.Get("common", "NATType")
+		tmpStr, ok := conf.Get("common", "NatType")
 		if ok {
 			args["--nat-type"] = tmpStr
 		} else {
+			fmt.Println("NatType is not specified, set to -1")
 			args["--nat-type"] = "-1"
 		}
 	}
-	client.NATType, err = strconv.Atoi(args["--nat-type"].(string))
+	client.NatType, err = strconv.Atoi(args["--nat-type"].(string))
 	if err != nil {
 		return err
 	}
 
-	// set services
 	for k, v := range conf {
 		if k != "common" {
 			name := k
@@ -199,44 +187,64 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			}
 			externalPort := tunnelPort
 			externalType := tunnelType
+			p2pAddrV4 := ""
+			p2pAddrV6 := ""
+			p2pPort := 0
 			if !strings.HasPrefix(strings.ToLower(tunnelType), "p2p") {
 				externalPort, err = strconv.Atoi(v["ExternalPort"])
 				if err != nil {
 					return err
 				}
 				externalType = v["ExternalType"]
+			} else {
+				if _, ok := v["P2PAddrV4"]; ok {
+					p2pAddrV4 = v["P2PAddrV4"]
+					p2pPort, err = strconv.Atoi(v["P2PPort"])
+					if err != nil {
+						return err
+					}
+				}
+				if _, ok := v["P2PAddrV6"]; ok {
+					p2pAddrV6 = v["P2PAddrV6"]
+					p2pPort, err = strconv.Atoi(v["P2PPort"])
+					if err != nil {
+						return err
+					}
+				}
 			}
-
-			p2pAddr := ""
-			if _, ok := v["P2pAddr"]; ok {
-				p2pAddr = v["P2pAddr"]
-			}
-
-			client.RegisterService(name, internalAddr, internalPort, internalType, externalPort, externalType, tunnelPort, tunnelType, tunnelEncrypt, p2pAddr)
+			client.RegisterService(
+				name,
+				internalAddr, internalPort, internalType,
+				externalPort, externalType,
+				tunnelPort, tunnelType, tunnelEncrypt,
+				p2pAddrV4, p2pAddrV6, p2pPort,
+			)
 		}
 	}
-
 	return nil
 }
 
 func main() {
-	// Parse Arguments
-	args := ParseArgs()
+	// Parse arguments
+	args := common.ParseArgs(&usage)
+	if args == nil {
+		return
+	}
 
-	// Load Configurations and register services
+	// Load configuration
 	err := LoadConf(args["--config-file"].(string), args)
 	if err != nil {
-		fmt.Printf("Error during loading configurations: %s\n", err.Error())
+		fmt.Printf("Error during loading configurations: %v\n", err)
 		return
 	}
 
 	// Initialize conf
 	err = client.InitConf()
 	if err != nil {
-		fmt.Printf("Error during initializing configurations: %s\n", err.Error())
+		fmt.Printf("Error during initializing configurations: %v\n", err)
 		return
 	}
 
-	// Start client
+	// Start the client
 	client.Run()
 }

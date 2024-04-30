@@ -1,28 +1,43 @@
 [common]
-ServerAddrV4 = localhost
-ServerAddrV6 = ip6-localhost
-ServerType = tcp6
-ServerPort = 7000
+; 服务器公钥文件
 PublicKeyFile = cert/PublicKey.pem
+; 服务器公钥长度文件
 NBitsFile = cert/NBits.txt
+; 服务器的ipv4地址
+ServerAddrV4 = localhost
+; 服务器的ipv6地址
+ServerAddrV6 = ip6-localhost
+; 服务器的监听端口
+ServerPort = 7000
+; 服务器类型, 支持tcp4/tcp6/kcp4/kcp6, 此处必须与服务器的ServerType一致
+; 注意: 如果使用tcp4/kcp4, 则必须指定服务器的ipv4地址ServerAddrV4, 如果使用tcp6/kcp6, 则必须指定服务器的ipv6地址ServerAddrV6
+ServerType = tcp6
+; 日志文件, console表示输出到控制台
 LogFile = console
+; 日志级别, 支持debug/info/warn/error
 LogLevel = info
+; 日志最大保留天数
 LogMaxDays = 3
 
 [ssh]
-InternalAddr = localhost
-InternalPort = 22
-;tcp
-InternalType = tcp
-; 0-65535, if 0 is specified, the server will allocate automatically
-TunnelPort = 7890
-;tcp/tcp4/tcp6/kcp/kcp4/kcp6/ssh/p2p/p2p4/p2p6
-TunnelType = tcp6
-;true/false
+; 要内网穿透的服务器的ip地址(ipv4/ipv6)
+InternalAddr = 127.0.0.1
+; 要内网穿透的服务器的端口
+InternalPort = 5102
+; 要内网穿透的服务器的类型, 支持tcp4/tcp6/kcp4/kcp6
+InternalType = tcp4
+; 指定建立的隧道在服务器上希望监听的端口, 0表示随机
+TunnelPort = 0
+; 指定建立的隧道在服务器上希望监听的类型, 支持tcp4/tcp6/kcp4/kcp6/ssh4/ssh6/p2p4/p2p6
+TunnelType = tcp4
+; 是否加密隧道
 TunnelEncrypt = false
-; if TunnelType is not p2p/p2p4/p2p6, the following parameters are required
 
-; 0-65535, if 0 is specified, the server will allocate automatically
-ExternalPort = 2222
-;tcp/tcp4/tcp6/p2p/p2p4/p2p6
+; 如果TunnelType为tcp4/tcp6/kcp4/kcp6/ssh4/ssh6, 则需要指定ExternalPort和ExternalType
+; 指定服务器对外监听的端口
+ExternalPort = 5102
+; 指定服务器对外监听的类型, 支持tcp4/tcp6/kcp4/kcp6
 ExternalType = tcp4
+
+; 如果TunnelType为p2p4/p2p6, 则可以指定p2p的公网地址, 此时将直接将此地址告知对端, 否则将使用UDP打洞来获取公网地址
+; P2pAddr = 10.42.0.16
