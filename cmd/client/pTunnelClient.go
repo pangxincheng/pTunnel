@@ -207,12 +207,12 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 				externalType = v["ExternalType"]
 			}
 
-			ip := ""
-			if _, ok := v["IP"]; ok {
-				ip = v["IP"]
+			p2pAddr := ""
+			if _, ok := v["P2pAddr"]; ok {
+				p2pAddr = v["P2pAddr"]
 			}
 
-			client.RegisterService(name, internalAddr, internalPort, internalType, externalPort, externalType, tunnelPort, tunnelType, tunnelEncrypt, ip)
+			client.RegisterService(name, internalAddr, internalPort, internalType, externalPort, externalType, tunnelPort, tunnelType, tunnelEncrypt, p2pAddr)
 		}
 	}
 

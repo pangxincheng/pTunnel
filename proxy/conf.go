@@ -10,6 +10,9 @@ var (
 	NBitsFile     string
 	ServerAddr    string
 	ServerPort    int
+	P2pAddr       string
+	LocalType     string
+	LocalPort     int
 	LogFile       string
 	LogWay        string
 	LogLevel      string

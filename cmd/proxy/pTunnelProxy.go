@@ -95,6 +95,42 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 		return err
 	}
 
+	// P2pAddr
+	if args["--p2p-addr"] == nil {
+		tmpStr, ok := conf.Get("common", "P2pAddr")
+		if ok {
+			args["--p2p-addr"] = tmpStr
+		} else {
+			args["--p2p-addr"] = ""
+		}
+	}
+	proxy.P2pAddr = args["--p2p-addr"].(string)
+
+	// LocalType
+	if args["--local-type"] == nil {
+		tmpStr, ok := conf.Get("common", "LocalType")
+		if ok {
+			args["--local-type"] = tmpStr
+		} else {
+			args["--local-type"] = "tcp"
+		}
+	}
+	proxy.LocalType = args["--local-type"].(string)
+
+	// LocalPort
+	if args["--local-port"] == nil {
+		tmpStr, ok := conf.Get("common", "LocalPort")
+		if ok {
+			args["--local-port"] = tmpStr
+		} else {
+			return errors.New("LocalPort is not specified")
+		}
+	}
+	proxy.LocalPort, err = strconv.Atoi(args["--local-port"].(string))
+	if err != nil {
+		return err
+	}
+
 	// LogFile
 	if args["--log-file"] == nil {
 		tmpStr, ok := conf.Get("common", "LogFile")

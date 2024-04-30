@@ -49,6 +49,10 @@ func (fsm *FSM) Run(state int) int {
 	return state
 }
 
+func (fsm *FSM) GetKCPSocket() *conn.KCPSocket {
+	return fsm.socket.kcpSocket
+}
+
 type FsmFn func(laddr *net.UDPAddr, raddr *net.UDPAddr) *FSM
 
 var fsmType2Func = map[string]FsmFn{
@@ -96,12 +100,13 @@ var fsmType2Func = map[string]FsmFn{
 			if string(socket.cache[:n]) == "SYN3" {
 				socket.udpSocket.Close()
 				socket.udpSocket = nil
+				time.Sleep(1 * time.Second)
 				return CREATE_KCP_LISTENER
 			}
 			return SEND_SYN2
 		})
 		v.AddState(CREATE_KCP_LISTENER, "CREATE_KCP_LISTENER", func(socket *SocketWrapper) int {
-			listener, err := conn.NewKCPListener(socket.laddr.IP.String(), socket.laddr.Port, "udp")
+			listener, err := conn.NewKCPListenerV2(socket.laddr)
 			if err != nil {
 				fmt.Printf("Failed to create KCP listener. Error: %v\n", err)
 				return ERR_STOP
@@ -251,7 +256,7 @@ var fsmType2Func = map[string]FsmFn{
 			return CREATE_KCP_LISTENER
 		})
 		v.AddState(CREATE_KCP_LISTENER, "CREATE_KCP_LISTENER", func(socket *SocketWrapper) int {
-			listener, err := conn.NewKCPListener(socket.laddr.IP.String(), socket.laddr.Port, "udp")
+			listener, err := conn.NewKCPListenerV2(socket.laddr)
 			if err != nil {
 				fmt.Printf("Failed to create KCP listener. Error: %v\n", err)
 				return KILL_KCP_LISTENER
@@ -328,6 +333,7 @@ var fsmType2Func = map[string]FsmFn{
 			socket.udpSocket.Write([]byte("SYN2"))
 			socket.udpSocket.Close()
 			socket.udpSocket = nil
+			time.Sleep(1 * time.Second)
 			return CREATE_KCP_SOCKET
 		})
 		v.AddState(CREATE_KCP_SOCKET, "CREATE_KCP_SOCKET", func(socket *SocketWrapper) int {
@@ -430,7 +436,7 @@ var fsmType2Func = map[string]FsmFn{
 			return CREATE_KCP_LISTENER
 		})
 		v.AddState(CREATE_KCP_LISTENER, "CREATE_KCP_LISTENER", func(socket *SocketWrapper) int {
-			listener, err := conn.NewKCPListener(socket.laddr.IP.String(), socket.laddr.Port, "udp")
+			listener, err := conn.NewKCPListenerV2(socket.laddr)
 			if err != nil {
 				fmt.Printf("Failed to create KCP listener. Error: %v\n", err)
 				return KILL_KCP_LISTENER
@@ -507,6 +513,7 @@ var fsmType2Func = map[string]FsmFn{
 			socket.udpSocket.Write([]byte("SYN2"))
 			socket.udpSocket.Close()
 			socket.udpSocket = nil
+			time.Sleep(1 * time.Second)
 			return CREATE_KCP_SOCKET
 		})
 		v.AddState(CREATE_KCP_SOCKET, "CREATE_KCP_SOCKET", func(socket *SocketWrapper) int {

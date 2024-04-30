@@ -1,0 +1,12 @@
+[common]
+; The proxy only will be used in the p2p tunnel mode.
+; So the proxy will build a kcpsocket to connect to the ServerAddr:ServerPort.
+ServerAddr = 175.24.94.35
+ServerPort = 7890
+; if you specify the P2pAddr, the p2p server will send it to the client.
+P2pAddr = [fe80::215:5dff:fec9:5063]:1234
+PublicKeyFile = cert/PublicKey.pem
+NBitsFile = cert/NBits.txt
+LogFile = console
+LogLevel = info
+LogMaxDays = 3

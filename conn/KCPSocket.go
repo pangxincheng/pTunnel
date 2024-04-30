@@ -144,3 +144,13 @@ func NewKCPListener(addr string, port int, network string) (Listener, error) {
 	listener.listener = kcpListener
 	return listener, nil
 }
+
+func NewKCPListenerV2(serverAddr *net.UDPAddr) (Listener, error) {
+	listener := &KCPListener{}
+	kcpListener, err := kcp.ListenWithOptions(serverAddr.String(), nil, 10, 3)
+	if err != nil {
+		return nil, err
+	}
+	listener.listener = kcpListener
+	return listener, nil
+}

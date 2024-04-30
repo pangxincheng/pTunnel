@@ -31,7 +31,7 @@ type Service struct {
 	SshPort          int    // only for ssh tunnel
 	SshUser          string // only for ssh tunnel
 	SshPassword      string // only for ssh tunnel
-	IP               string // only for p2p tunnel
+	P2pAddr          string // only for p2p tunnel
 
 	ControlSocket  conn.Socket
 	ControlMsgChan chan int
@@ -274,8 +274,8 @@ func (service *Service) p2pTunnel(tunnel conn.Socket) {
 	// Construct metadata, serialize and encrypt
 	dict := make(map[string]interface{})
 	dict["SecretKey"] = string(security.AesGenKey(32))
-	if service.IP != "" {
-		dict["Addr"] = service.IP
+	if service.P2pAddr != "" {
+		dict["Addr"] = service.P2pAddr
 	}
 	dict["Type"] = "Client"
 	dict["NATType"] = strconv.Itoa(mappingType*3 + filteringType)
@@ -316,7 +316,12 @@ func (service *Service) p2pTunnel(tunnel conn.Socket) {
 
 	// UDP Hole Punching
 	_ = tunnel.Close()
-	laddr, err := net.ResolveUDPAddr("udp", tunnel.(*conn.KCPSocket).GetSocket().LocalAddr().String())
+	var laddr *net.UDPAddr
+	if service.P2pAddr != "" {
+		laddr, err = net.ResolveUDPAddr("udp", service.P2pAddr)
+	} else {
+		laddr, err = net.ResolveUDPAddr("udp", tunnel.(*conn.KCPSocket).GetSocket().LocalAddr().String())
+	}
 	if err != nil {
 		log.Error("Resolve local UDP address failed. Error: %v", err)
 		return
@@ -342,6 +347,21 @@ func (service *Service) p2pTunnel(tunnel conn.Socket) {
 		return
 	}
 	fmt.Printf("Service [%s] p2p tunnel is established\n", service.Name)
+
+	kcpSocket := fsm.GetKCPSocket()
+	var client conn.Socket
+	switch strings.ToLower(service.InternalType) {
+	case "tcp", "tcp4", "tcp6":
+		client, err = conn.NewTCPSocket(service.InternalAddr, service.InternalPort, "tcp")
+		if err != nil {
+			log.Error("Service [%s] connect to internal service failed. Error: %v", service.Name, err)
+			return
+		}
+	default:
+		log.Error("Service [%s] unknown internal type: %s", service.Name, service.InternalType)
+		return
+	}
+	service.tunnel(client, kcpSocket)
 }
 
 func (service *Service) controlMsgReader() {
@@ -396,7 +416,7 @@ func RegisterService(
 	tunnelPort int,
 	tunnelType string,
 	tunnelEncrypt bool,
-	ip string,
+	p2pAddr string,
 ) {
 	services[name] = &Service{
 		Name:          name,
@@ -408,7 +428,7 @@ func RegisterService(
 		TunnelPort:    tunnelPort,
 		TunnelType:    tunnelType,
 		TunnelEncrypt: tunnelEncrypt,
-		IP:            ip,
+		P2pAddr:       p2pAddr,
 	}
 }
 

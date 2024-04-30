@@ -106,3 +106,13 @@ func NewTCPListener(addr string, port int, network string) (Listener, error) {
 	}
 	return listener, nil
 }
+
+func NewTCPListenerV2(serverAddr *net.TCPAddr) (Listener, error) {
+	listener := &TCPListener{}
+	var err error
+	listener.listener, err = net.ListenTCP("tcp", serverAddr)
+	if err != nil {
+		return nil, err
+	}
+	return listener, nil
+}

@@ -81,3 +81,7 @@ func NewSSHSocket(addr string, port int, sshPort int, sshUser string, sshPasswor
 func NewSSHListener(addr string, port int, network string) (Listener, error) {
 	return NewTCPListener(addr, port, network)
 }
+
+func NewSSHListenerV2(serverAddr *net.TCPAddr) (Listener, error) {
+	return NewTCPListenerV2(serverAddr)
+}

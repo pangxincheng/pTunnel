@@ -4,15 +4,18 @@ import (
 	"fmt"
 	"net"
 	"pTunnel/conn"
+	tunnel2 "pTunnel/tunnel"
 	"pTunnel/utils/log"
 	"pTunnel/utils/p2p"
 	"pTunnel/utils/security"
 	"pTunnel/utils/serialize"
 	"strconv"
+	"strings"
 )
 
 type Proxy struct {
-	socket *conn.KCPSocket
+	proxySocket *conn.TCPSocket
+	socket      *conn.KCPSocket
 }
 
 func (proxy *Proxy) run() {
@@ -38,6 +41,9 @@ func (proxy *Proxy) run() {
 	// Construct metadata, serialize and encrypt
 	dict := make(map[string]interface{})
 	dict["SecretKey"] = string(security.AesGenKey(32))
+	if P2pAddr != "" {
+		dict["Addr"] = P2pAddr
+	}
 	dict["Type"] = "Proxy"
 	dict["NATType"] = strconv.Itoa(mappingType*3 + filteringType)
 	bytes, err := serialize.Serialize(&dict)
@@ -77,7 +83,12 @@ func (proxy *Proxy) run() {
 
 	// UDP hole punching
 	_ = proxy.socket.Close()
-	laddr, err := net.ResolveUDPAddr("udp", proxy.socket.GetSocket().LocalAddr().String())
+	var laddr *net.UDPAddr
+	if P2pAddr != "" {
+		laddr, err = net.ResolveUDPAddr("udp", P2pAddr)
+	} else {
+		laddr, err = net.ResolveUDPAddr("udp", proxy.socket.GetSocket().LocalAddr().String())
+	}
 	if err != nil {
 		log.Error("Resolve local UDP address failed. Error: %v", err)
 		return
@@ -103,18 +114,70 @@ func (proxy *Proxy) run() {
 		return
 	}
 	fmt.Println("UDP hole punching done")
+	kcpSocket := fsm.GetKCPSocket()
+	proxy.tunnel(proxy.proxySocket, kcpSocket)
+}
+
+func (proxy *Proxy) tunnel(client conn.Socket, tunnel conn.Socket) {
+	closeFn := func(tunnel conn.Socket) {
+		err := tunnel.Close()
+		if err != nil {
+			log.Error("Close a tunnel failed. Error: %v", err)
+		}
+	}
+	defer closeFn(tunnel)
+	defer closeFn(client)
+	// if !tunnel2.ClientTunnelSafetyCheck(tunnel, proxy.SecretKey) {
+	// 	log.Error("Tunnel safety check failed")
+	// 	return
+	// }
+	// if !proxy.TunnelEncrypt {
+	tunnel2.UnsafeTunnel(client, tunnel)
+	// 	return
+	// } else {
+	// 	tunnel2.SafeTunnel(client, tunnel, proxy.SecretKey)
+	// }
 }
 
 func Run() {
 	log.InitLog(LogWay, LogFile, LogLevel, LogMaxDays)
 
-	socket, err := conn.NewKCPSocket(ServerAddr, ServerPort, "udp")
-	if err != nil {
-		log.Error("Failed to create KCP Socket. Error: %v", err)
+	var addr *net.TCPAddr
+	var err error
+	switch strings.ToLower(LocalType) {
+	case "tcp", "tcp4":
+		addr, err = net.ResolveTCPAddr("tcp4", fmt.Sprintf("0.0.0.0:%d", LocalPort))
+	case "tcp6":
+		addr, err = net.ResolveTCPAddr("tcp6", fmt.Sprintf("[::]:%d", LocalPort))
+	default:
+		log.Error("Unsupported local type: %s", LocalType)
 		return
 	}
-	proxy := &Proxy{
-		socket: socket.(*conn.KCPSocket),
+	if err != nil {
+		log.Error("Failed to resolve TCP address. Error: %v", err)
+		return
 	}
-	proxy.run()
+
+	proxyServer, err := conn.NewTCPListenerV2(addr)
+	if err != nil {
+		log.Error("Failed to create TCP Listener. Error: %v", err)
+		return
+	}
+
+	for {
+		socket, err := proxyServer.Accept()
+		if err != nil {
+			log.Error("Failed to accept connection. Error: %v", err)
+			continue
+		}
+		proxy := &Proxy{}
+		kcpSocket, err := conn.NewKCPSocket(ServerAddr, ServerPort, "udp")
+		if err != nil {
+			log.Error("Failed to create KCP Socket. Error: %v", err)
+			continue
+		}
+		proxy.socket = kcpSocket.(*conn.KCPSocket)
+		proxy.proxySocket = socket.(*conn.TCPSocket)
+		go proxy.run()
+	}
 }
