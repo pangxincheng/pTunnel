@@ -140,10 +140,12 @@ func (service *Service) extractMetadata() (err error) {
 
 func (service *Service) createExternalListener() (err error) {
 	switch strings.ToLower(service.ExternalType) {
-	case "tcp", "tcp4", "tcp6":
+	case "tcp4", "tcp6":
 		service.ExternalListener, err = conn.NewListener(service.ExternalType, consts.Auto, service.ExternalPort)
-	case "p2p", "p2p4", "p2p6":
-		service.ExternalListener, err = conn.NewListener("kcp", consts.Auto, service.ExternalPort)
+	case "p2p4":
+		service.ExternalListener, err = conn.NewListener("kcp4", consts.Auto, service.ExternalPort)
+	case "p2p6":
+		service.ExternalListener, err = conn.NewListener("kcp6", consts.Auto, service.ExternalPort)
 	default:
 		err = errors.New("unsupported ExternalType")
 	}
