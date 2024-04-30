@@ -253,8 +253,11 @@ UDP打洞的过程实际上类似于TCP握手的过程, TCP三次握手是为了
 | APDM+APDF | `Fn1(B, A)` | `Fn3(B, A)` | `Fn3(B, A)` | No Solution | No Solution | No Solution | No Solution | No Solution | No Solution |
 
 - `Fn1(clientA, clientB)`的状态机
+
 clientA端口固定, 会放通所有的请求
+
 clientB没有要求
+
 ```mermaid
 flowchart TD
 
@@ -296,8 +299,11 @@ Bn5 -->B_STOP
 ```
 
 - `Fn2(clientA, clientB)`的状态机
+
 clientA的IP和端口固定，但是会对访问的IP(和端口)进行限制
+
 clientB的IP和端口固定，但是会对访问的IP(和端口)进行限制
+
 ```mermaid
 flowchart TD
 An1["A_START"] --> An2["A_SEND_SYN1"]
@@ -322,8 +328,11 @@ Bn7 -->|recv heartbeat| B_STOP
 ```
 
 - `Fn3(clientA, clientB)`的状态机
-- clientA的IP和端口固定，但是会对访问的IP(和端口)进行限制
-- clientB的IP和端口不固定，但是会直接放通所有的请求/对访问的IP(和端口)进行限制
+
+clientA的IP和端口固定，但是会对访问的IP(和端口)进行限制
+
+clientB的IP和端口不固定，但是会直接放通所有的请求/对访问的IP(和端口)进行限制
+
 ```mermaid
 flowchart TD
 An1["A_START"] --> An2["A_SEND_SYN1->[1024, 65535]\n(port prediction)"]
