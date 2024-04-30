@@ -4,7 +4,7 @@ PrivateKeyFile = cert/PrivateKey.pem
 ; 服务器公钥长度文件
 NBitsFile = cert/NBits.txt
 ; 服务器类型, 支持tcp4/tcp6/kcp4/kcp6
-ServerType = tcp6
+ServerType = tcp4
 ; 服务器监听端口, 这会创建一个listener同时监听ipv4和ipv6的ServerPort端口
 ServerPort = 7000
 ; 日志文件, console表示输出到控制台
