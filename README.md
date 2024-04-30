@@ -126,6 +126,7 @@ New：目前已经为该工具添加了P2P的支持，其核心技术是使用UD
 
 #### 服务器中转
 基于服务器中转的设计方案如下:
+
 <div style="text-align:center;">
   <img src="doc/fig/overview.png" alt="基于服务器中转的方案" style="width:80%; height:auto;" />
   <p style="font-size: smaller; color: grey;">图1: 基于服务器中转的方案</p>
@@ -147,6 +148,7 @@ New：目前已经为该工具添加了P2P的支持，其核心技术是使用UD
 P2P技术的难点在于NAT路由器, NAT路由器的最初目的用于缓解ipv4地址不够用的问题, 但是NAT路由器对P2P技术造成了很严重的阻碍, 如果没有NAT路由器, P2P的通信是非常简单的事情.
 ##### 理论准备
 NAT路由器的基本功能是将内网的一个套接字IP:port映射到外网的一个套接字IP:port:
+
 $$
 \begin{equation}
 {\rm ip_{e}}, {\rm port_{e}} = {\rm NAT}\left({\rm ip_{i}}, {\rm port_{i}}\right)
@@ -160,6 +162,7 @@ $$
 1. 映射规则(Mapping Behavior)
     1. Endpoint-Independent Mapping
     NAT映射函数：
+
     $$
     \begin{equation}
     {\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}\right)
@@ -168,6 +171,7 @@ $$
     即NAT映射后的IP只和发送方IP以及Port相关
     2. Address-Dependent Mapping
     NAT映射函数：
+
     $$
     \begin{equation}
     {\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}, {\rm ip_{tgt}}\right)
@@ -176,6 +180,7 @@ $$
     即NAT映射除了和发送方的IP以及Port相关外，还和接收方的IP相关
     3. Address-and-Port-Dependent Mapping
     NAT映射函数：
+
     $$
     \begin{equation}
     {\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}, {\rm ip_{tgt}}, {\rm port_{tgt}}\right)
@@ -187,20 +192,20 @@ $$
     为了方便描述，我们统一定义位于内网的IP地址为192.168.1.a，经过NAT之后的IP为
     184.167.234.191，要访问的外网IP为：1.1.1.1:yyyy
 
-    1. Endpoint-Indenpendent Filtering
-    过滤规则：对于发往184.167.234.191:xxxx的数据，NAT路由器检查
-        1.是否有内网的socket和184.167.234.191:xxxx进行了绑定
-    如果有，则直接将数据转发到该socket上
-    2. Address-Dependent Filtering
-    过滤规则：对于发往184.167.234.191:xxxx的数据，NAT路由器检查
-        1. 是否有内网的socket和184.167.234.191:xxxx进行了绑定
-        2. 是否184.167.234.191:xxxx和1.1.1.1进行过通信
-    如果有，则直接将数据转发到该socket上
-    3. Address-and-Port-Dependent Filtering
-    过滤规则：对于发往184.167.234.191:xxxx的数据，NAT路由器检查
-        1. 是否有内网的socket和184.167.234.191:xxxx进行了绑定
-        2. 是否184.167.234.191:xxxx和1.1.1.1:yyyy进行过通信
-    如果有，则直接将数据转发到该socket上
+    1. Endpoint-Indenpendent Filtering  
+    过滤规则：对于发往184.167.234.191:xxxx的数据，NAT路由器检查  
+        1.是否有内网的socket和184.167.234.191:xxxx进行了绑定  
+    如果有，则直接将数据转发到该socket上  
+    2. Address-Dependent Filtering   
+    过滤规则：对于发往184.167.234.191:xxxx的数据，NAT路由器检查  
+        1. 是否有内网的socket和184.167.234.191:xxxx进行了绑定  
+        2. 是否184.167.234.191:xxxx和1.1.1.1进行过通信  
+    如果有，则直接将数据转发到该socket上  
+    3. Address-and-Port-Dependent Filtering  
+    过滤规则：对于发往184.167.234.191:xxxx的数据，NAT路由器检查  
+        1. 是否有内网的socket和184.167.234.191:xxxx进行了绑定  
+        2. 是否184.167.234.191:xxxx和1.1.1.1:yyyy进行过通信  
+    如果有，则直接将数据转发到该socket上  
 
 在[RFC5389](https://datatracker.ietf.org/doc/html/rfc5389)的定义下，可以重新得到[RFC3489](https://datatracker.ietf.org/doc/html/rfc3489)下定义的NAT
 1. Full Cone NAT(完全圆锥NAT) = Endpoint-Independent Mapping + Endpoint-Independent Filtering
@@ -221,12 +226,12 @@ UDP打洞的过程实际上类似于TCP握手的过程, TCP三次握手是为了
 针对不同的nat设备, 我使用了不同的状态机建模UDP打洞过程, 下面是我的建模(不一定对)
 ###### UDP打洞的状态机
 定义：
-> EIM     = Endpoint-Independent Mapping
-> ADM     = Address-Dependent Mapping
-> APDM    = Address-and-Port-Dependent Mapping
-> EIF     = Endpoint-Independent Filtering
-> ADF     = Address-Dependent Filtering
-> APDF    = Address-and-Port-Dependent Filtering
+> EIM     = Endpoint-Independent Mapping  
+> ADM     = Address-Dependent Mapping  
+> APDM    = Address-and-Port-Dependent Mapping  
+> EIF     = Endpoint-Independent Filtering  
+> ADF     = Address-Dependent Filtering  
+> APDF    = Address-and-Port-Dependent Filtering  
 
 | A行B列      | EIM+EIF   | EIM+ADF   | EIM+APDF  | ADM+EIF     | ADM+ADF     | ADM+APDF    | APDM+EIF    | APDM+ADF    | APDM+APDF   |
 | --------- | --------- | --------- | --------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |
@@ -337,18 +342,21 @@ Bn7 -->|recv heartbeat| B_STOP
 其中有几点要注意, 我们在clientA的`Fn3(clientA, clientB)`的状态机中使用了端口预测, 这个技术的理论基础是生日悖论, 设目标端口x是服从均匀分布的, 问不放回的均匀采样N次选中X的概率是多少?
 
 可以算一下, 第i次没有选中的概率为:
+
 $$
 \begin{equation}
 \frac{65535-1024-i}{65535-1024}
 \end{equation}
 $$
 那么选N次选中x的概率为:
+
 $$
 \begin{equation}
 p = 1 - \prod \limits_{i=1}^{N}\frac{65535-1024-i}{65535-1024}
 \end{equation}
 $$
 N-p的曲线如下图所示
+
 <div style="text-align:center;">
   <img src="doc/fig/prob.png" alt="N-p" style="width:50%; height:auto;" />
   <p style="font-size: smaller; color: grey;">图2: N-p</p>
