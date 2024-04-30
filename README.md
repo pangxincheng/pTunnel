@@ -160,55 +160,55 @@ $$
 按照[RFC5389](https://datatracker.ietf.org/doc/html/rfc5389)的定义, NAT路由器的类别可以由其映射规则(MappingBehavior)和过滤规则(FilterBehavior)定义(还有另外一种定义: 全锥型, 端口限制型, 地址端口限制型, 对称型, 这个定义是在早期的[RFC3489](https://datatracker.ietf.org/doc/html/rfc3489)中给出的定义, 但是其定义并不完全, 所以[RFC3489](https://datatracker.ietf.org/doc/html/rfc3489)已经完全被[RFC5389](https://datatracker.ietf.org/doc/html/rfc5389)取代了, [RFC5389](https://datatracker.ietf.org/doc/html/rfc5389)中定义的NAT路由器类别可以完全覆盖到[RFC3489](https://datatracker.ietf.org/doc/html/rfc3489)中定义的四种类型)
 
 1. 映射规则(Mapping Behavior)
-    1. Endpoint-Independent Mapping
-    NAT映射函数：
+1.1 Endpoint-Independent Mapping
+NAT映射函数：
 
-    $$
-    \begin{equation}
-    {\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}\right)
-    \end{equation}
-    $$
+$$
+\begin{equation}
+{\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}\right)
+\end{equation}
+$$
 
-    即NAT映射后的IP只和发送方IP以及Port相关
-    2. Address-Dependent Mapping
-    NAT映射函数：
+即NAT映射后的IP只和发送方IP以及Port相关
+1.2. Address-Dependent Mapping
+NAT映射函数：
 
-    $$
-    \begin{equation}
-    {\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}, {\rm ip_{tgt}}\right)
-    \end{equation}
-    $$
+$$
+\begin{equation}
+{\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}, {\rm ip_{tgt}}\right)
+\end{equation}
+$$
 
-    即NAT映射除了和发送方的IP以及Port相关外，还和接收方的IP相关
-    3. Address-and-Port-Dependent Mapping
-    NAT映射函数：
+即NAT映射除了和发送方的IP以及Port相关外，还和接收方的IP相关
+1.3. Address-and-Port-Dependent Mapping
+NAT映射函数：
 
-    $$
-    \begin{equation}
-    {\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}, {\rm ip_{tgt}}, {\rm port_{tgt}}\right)
-    \end{equation}
-    $$
+$$
+\begin{equation}
+{\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}, {\rm ip_{tgt}}, {\rm port_{tgt}}\right)
+\end{equation}
+$$
 
-    即NAT映射跟发送方的IP以及Port，接收方的IP以及Port相关
+即NAT映射跟发送方的IP以及Port，接收方的IP以及Port相关
 2. 过滤规则(Filtering Behavior)
 
-    为了方便描述，我们统一定义位于内网的IP地址为192.168.1.a，经过NAT之后的IP为
-    184.167.234.191，要访问的外网IP为：1.1.1.1:yyyy
+为了方便描述，我们统一定义位于内网的IP地址为192.168.1.a，经过NAT之后的IP为
+184.167.234.191，要访问的外网IP为：1.1.1.1:yyyy
 
-    1. Endpoint-Indenpendent Filtering  
-    过滤规则：对于发往184.167.234.191:xxxx的数据，NAT路由器检查  
-        1.是否有内网的socket和184.167.234.191:xxxx进行了绑定  
-    如果有，则直接将数据转发到该socket上  
-    2. Address-Dependent Filtering   
-    过滤规则：对于发往184.167.234.191:xxxx的数据，NAT路由器检查  
-        1. 是否有内网的socket和184.167.234.191:xxxx进行了绑定  
-        2. 是否184.167.234.191:xxxx和1.1.1.1进行过通信  
-    如果有，则直接将数据转发到该socket上  
-    3. Address-and-Port-Dependent Filtering  
-    过滤规则：对于发往184.167.234.191:xxxx的数据，NAT路由器检查  
-        1. 是否有内网的socket和184.167.234.191:xxxx进行了绑定  
-        2. 是否184.167.234.191:xxxx和1.1.1.1:yyyy进行过通信  
-    如果有，则直接将数据转发到该socket上  
+2.1. Endpoint-Indenpendent Filtering  
+过滤规则：对于发往184.167.234.191:xxxx的数据，NAT路由器检查  
+    1.是否有内网的socket和184.167.234.191:xxxx进行了绑定  
+如果有，则直接将数据转发到该socket上  
+2.2. Address-Dependent Filtering   
+过滤规则：对于发往184.167.234.191:xxxx的数据，NAT路由器检查  
+    1. 是否有内网的socket和184.167.234.191:xxxx进行了绑定  
+    2. 是否184.167.234.191:xxxx和1.1.1.1进行过通信  
+如果有，则直接将数据转发到该socket上  
+2.3. Address-and-Port-Dependent Filtering  
+过滤规则：对于发往184.167.234.191:xxxx的数据，NAT路由器检查  
+    1. 是否有内网的socket和184.167.234.191:xxxx进行了绑定  
+    2. 是否184.167.234.191:xxxx和1.1.1.1:yyyy进行过通信  
+如果有，则直接将数据转发到该socket上  
 
 在[RFC5389](https://datatracker.ietf.org/doc/html/rfc5389)的定义下，可以重新得到[RFC3489](https://datatracker.ietf.org/doc/html/rfc3489)下定义的NAT
 1. Full Cone NAT(完全圆锥NAT) = Endpoint-Independent Mapping + Endpoint-Independent Filtering
