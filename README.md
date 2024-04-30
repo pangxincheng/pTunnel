@@ -169,6 +169,7 @@ $$
 {\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}\right)
 \end{equation}
 $$
+
 即NAT映射后的IP只和发送方IP以及Port相关  
 
 - Address-Dependent Mapping
@@ -179,6 +180,7 @@ $$
 {\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}, {\rm ip_{tgt}}\right)
 \end{equation}
 $$
+
 即NAT映射除了和发送方的IP以及Port相关外，还和接收方的IP相关
 
 - Address-and-Port-Dependent Mapping
@@ -189,6 +191,7 @@ $$
 {\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}, {\rm ip_{tgt}}, {\rm port_{tgt}}\right)
 \end{equation}
 $$
+
 即NAT映射跟发送方的IP以及Port，接收方的IP以及Port相关
 
 2. 过滤规则(Filtering Behavior)
