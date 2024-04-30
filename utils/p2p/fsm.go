@@ -50,6 +50,7 @@ func (fsm *FSM) Run(state int) int {
 }
 
 func (fsm *FSM) GetKCPSocket() *conn.KCPSocket {
+	fsm.socket.kcpSocket.Socket.SetDeadline(time.Time{})
 	return fsm.socket.kcpSocket
 }
 
