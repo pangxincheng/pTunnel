@@ -169,6 +169,7 @@ $$
     {\rm ip_{nat}}, {\rm port_{nat}} = {\rm NAT}\left({\rm ip_{src}}, {\rm port_{src}}\right)
     \end{equation}
     $$
+    
     即NAT映射后的IP只和发送方IP以及Port相关  
 
     2. Address-Dependent Mapping
