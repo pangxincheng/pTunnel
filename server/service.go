@@ -462,7 +462,7 @@ func (service *Service) p2pTunnel(proxy conn.Socket, tunnel conn.Socket, proxyMe
 		}
 	}
 	metadata["FSMType"] = natType2FsmForTunnel[pNatType][tNatType]
-	metadata["SecretKey"] = secretKey
+	metadata["SecretKey"] = string(secretKey)
 	metadata["TunnelEncrypt"] = service.TunnelEncrypt
 	bytes, err := serialize.Serialize(&metadata)
 	if err != nil {
@@ -498,7 +498,7 @@ func (service *Service) p2pTunnel(proxy conn.Socket, tunnel conn.Socket, proxyMe
 		}
 	}
 	metadata["FSMType"] = natType2FsmForProxy[pNatType][tNatType]
-	metadata["SecretKey"] = secretKey
+	metadata["SecretKey"] = string(secretKey)
 	metadata["TunnelEncrypt"] = service.TunnelEncrypt
 	bytes, err = serialize.Serialize(&metadata)
 	if err != nil {
