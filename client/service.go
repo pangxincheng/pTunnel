@@ -248,26 +248,43 @@ func (service *Service) p2pTunnel(tunnel conn.Socket) {
 	var LAddr *net.UDPAddr
 	var FSMType string
 	var SecretKey []byte
+	var p2pAddr string
 
 	extractMetadata := func() (err error) {
 		secretKey := security.AesGenKey(32)
 		dict := make(map[string]interface{})
 		if service.P2PAddrV4 != "" {
+			p2pAddr = service.P2PAddrV4
+			if !conn.IsValidIP(service.P2PAddrV4) {
+				p2pAddr, err = conn.GetIPAddressFromInterfaceName(service.P2PAddrV4, "ipv4")
+				if err != nil {
+					log.Error("Service [%s] get IP address failed. Error: %v", service.Name, err)
+					return
+				}
+			}
 			service.P2PPort, err = conn.GetAvailablePort("udp4")
 			if err != nil {
 				log.Error("Service [%s] get available port failed. Error: %v", service.Name, err)
 				return
 			}
-			dict["Addr"] = service.P2PAddrV4
+			dict["Addr"] = p2pAddr
 			dict["Port"] = strconv.Itoa(service.P2PPort)
 			dict["Network"] = "udp4"
 		} else if service.P2PAddrV6 != "" {
+			p2pAddr = service.P2PAddrV6
+			if !conn.IsValidIP(service.P2PAddrV6) {
+				p2pAddr, err = conn.GetIPAddressFromInterfaceName(service.P2PAddrV6, "ipv6")
+				if err != nil {
+					log.Error("Service [%s] get IP address failed. Error: %v", service.Name, err)
+					return
+				}
+			}
 			service.P2PPort, err = conn.GetAvailablePort("udp6")
 			if err != nil {
 				log.Error("Service [%s] get available port failed. Error: %v", service.Name, err)
 				return
 			}
-			dict["Addr"] = service.P2PAddrV6
+			dict["Addr"] = p2pAddr
 			dict["Port"] = strconv.Itoa(service.P2PPort)
 			dict["Network"] = "udp6"
 		}
@@ -314,9 +331,9 @@ func (service *Service) p2pTunnel(tunnel conn.Socket) {
 			return
 		}
 		if service.P2PAddrV4 != "" {
-			LAddr, err = net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%s", service.P2PAddrV4, strconv.Itoa(service.P2PPort)))
+			LAddr, err = net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%s", p2pAddr, strconv.Itoa(service.P2PPort)))
 		} else if service.P2PAddrV6 != "" {
-			LAddr, err = net.ResolveUDPAddr("udp6", fmt.Sprintf("%s:%s", service.P2PAddrV6, strconv.Itoa(service.P2PPort)))
+			LAddr, err = net.ResolveUDPAddr("udp6", fmt.Sprintf("%s:%s", p2pAddr, strconv.Itoa(service.P2PPort)))
 		} else if service.TunnelType == "p2p4" {
 			LAddr, err = net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%s", "0.0.0.0", strconv.Itoa(service.TunnelPort)))
 		} else if service.TunnelType == "p2p6" {

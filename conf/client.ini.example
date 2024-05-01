@@ -55,6 +55,7 @@ ExternalType = tcp4
 
 ; 如果TunnelType为p2p4/p2p6, 则可以指定p2p的公网地址, 此时将直接将此地址告知对端, 否则将使用UDP打洞来获取公网地址
 ; 如果想要显式指定本机p2p的公网地址, 则可以在此处(P2PAddrAndPortV4/P2PAddrAndPortV6)指定
+; 另外, 如果公网地址不固定, 可以指定为网卡的名字, 程序会自动检测当前网卡上是否有ipv4/ipv6的地址
 ; 否则将使用UDP打洞来获取公网地址
 ; P2PAddrV4 = 10.42.0.16
 ; P2pAddrV6 = [fe80::f0d1:1e0d:1e0d:1e0d]

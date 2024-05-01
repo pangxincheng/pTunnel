@@ -266,3 +266,43 @@ func GetAvailablePort(lType string) (port int, err error) {
 	}
 	return
 }
+
+func IsValidIP(ip string) bool {
+	return net.ParseIP(ip) != nil
+}
+
+func GetIPAddressFromInterfaceName(ifaceName string, network string) (string, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	for _, iface := range interfaces {
+		if iface.Name == ifaceName {
+			addrs, err := iface.Addrs()
+			if err != nil {
+				return "", err
+			}
+			ip := ""
+			for _, addr := range addrs {
+				addrStr := strings.Split(addr.String(), "/")[0]
+				cip := net.ParseIP(addrStr)
+				if cip == nil {
+					continue
+				}
+				if network == "ipv4" && cip.To4() != nil {
+					ip = cip.String()
+					break
+				} else if network == "ipv6" && cip.To4() == nil && cip.To16() != nil {
+					ip = "[" + cip.String() + "]"
+					break
+				}
+			}
+			if ip == "" {
+				return "", errors.New("no available IP address found")
+			}
+			return ip, nil
+		}
+	}
+	err = errors.New("interface not found: " + ifaceName)
+	return "", err
+}
