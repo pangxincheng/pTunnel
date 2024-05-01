@@ -49,7 +49,7 @@ func (socket *SSHSocket) Address() (net.Addr, net.Addr) {
 	return (*socket.Socket).LocalAddr(), (*socket.Socket).RemoteAddr()
 }
 
-func NewSSHSocket(raddr *net.TCPAddr, network string, sshPort int, sshUser string, sshSigher ssh.Signer) (Socket, error) {
+func NewSSHSocket(raddr *net.TCPAddr, network string, sshAddr string, sshUser string, sshSigher ssh.Signer) (Socket, error) {
 	sshConfig := &ssh.ClientConfig{
 		User: sshUser,
 		Auth: []ssh.AuthMethod{
@@ -57,7 +57,7 @@ func NewSSHSocket(raddr *net.TCPAddr, network string, sshPort int, sshUser strin
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
-	sshClient, err := ssh.Dial(network, raddr.String(), sshConfig)
+	sshClient, err := ssh.Dial(network, sshAddr, sshConfig)
 	if err != nil {
 		return nil, err
 	}

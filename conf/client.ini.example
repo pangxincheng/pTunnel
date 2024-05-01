@@ -33,6 +33,9 @@ LogMaxDays = 3
 ;     2: Address-and-Port-Dependent Filtering
 NatType = -1
 
+; Ssh私钥文件位置
+SSHPrivateKeyFile = /home/xincheng/.ssh/id_rsa
+
 [ssh]
 ; 要内网穿透的服务器的ip地址(ipv4/ipv6)
 InternalAddr = 127.0.0.1

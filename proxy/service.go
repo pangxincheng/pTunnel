@@ -74,7 +74,7 @@ func (service *Service) createTunnelSocket() (err error) {
 		socketType,
 		consts.Auto, consts.Auto, 0,
 		ServerAddrV4, ServerAddrV6,
-		service.TunnelPort, consts.UnConf, nil,
+		service.TunnelPort, consts.UnConf, 0, nil,
 	)
 	if err != nil {
 		log.Error("Create tunnel socket failed. Error: %v", err)

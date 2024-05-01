@@ -82,7 +82,7 @@ func (service *Service) createControlSocket() (err error) {
 		ServerType,
 		consts.Auto, consts.Auto, 0,
 		ServerAddrV4, ServerAddrV6, ServerPort,
-		consts.UnConf, nil,
+		consts.UnConf, 0, nil,
 	)
 	if err != nil {
 		log.Error("Service [%s] connect to server failed. Error: %v", service.Name, err)
@@ -146,7 +146,7 @@ func (service *Service) extractMetadata() (err error) {
 		log.Error("Service [%s] extract heartbeat timeout failed. Error: %v", service.Name, err)
 		return
 	}
-	if service.TunnelType == "ssh" {
+	if strings.HasPrefix(strings.ToLower(service.TunnelType), "ssh") {
 		service.SshPort, err = strconv.Atoi(dict["SshPort"].(string))
 		if err != nil || service.SshPort == 0 {
 			log.Error("Service [%s] extract ssh port failed. Error: %v", service.Name, err)
@@ -203,7 +203,7 @@ func (service *Service) tunnelCreator() {
 			socketType,
 			consts.Auto, consts.Auto, 0,
 			ServerAddrV4, ServerAddrV6,
-			service.TunnelPort, consts.UnConf, nil,
+			service.TunnelPort, service.SshUser, service.SshPort, SshSigner,
 		)
 		if err != nil {
 			log.Error("Service [%s] create a new tunnel failed. Error: %v", service.Name, err)
@@ -214,7 +214,7 @@ func (service *Service) tunnelCreator() {
 				service.InternalType,
 				consts.Auto, consts.Auto, 0,
 				service.InternalAddr, service.InternalAddr,
-				service.InternalPort, consts.UnConf, nil,
+				service.InternalPort, consts.UnConf, 0, nil,
 			)
 			if err != nil {
 				tunnel.Close()
@@ -394,7 +394,7 @@ func (service *Service) p2pTunnel(tunnel conn.Socket) {
 		service.InternalType,
 		consts.Auto, consts.Auto, 0,
 		service.InternalAddr, service.InternalAddr,
-		service.InternalPort, consts.UnConf, nil,
+		service.InternalPort, consts.UnConf, 0, nil,
 	)
 	if err != nil {
 		log.Error("Service [%s] create a new client failed. Error: %v", service.Name, err)

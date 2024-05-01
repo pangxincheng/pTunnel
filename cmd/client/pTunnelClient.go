@@ -29,6 +29,7 @@ Options:
 	--log-level=<log-level>                Specify the log level. [options: debug, info, warning, error] [default: info]
 	--log-max-days=<log-max-days>          Specify the log max days.
 	--nat-type=<nat-type>                  Specify the NAT type. [options: 0, 1, 2, 3, 4, 5, 6, 7, 8]
+	--ssh-private-key-file=<ssh-private-key-file> Specify the ssh private key file.
 `
 
 func LoadConf(confFile string, args map[string]interface{}) error {
@@ -163,6 +164,17 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+
+	// SSHPrivateKeyFile
+	if args["--ssh-private-key-file"] == nil {
+		tmpStr, ok := conf.Get("common", "SSHPrivateKeyFile")
+		if ok {
+			args["--ssh-private-key-file"] = tmpStr
+		} else {
+			args["--ssh-private-key-file"] = ""
+		}
+	}
+	client.SSHPrivateKeyFile = args["--ssh-private-key-file"].(string)
 
 	for k, v := range conf {
 		if k != "common" {

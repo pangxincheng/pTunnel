@@ -92,7 +92,7 @@ func NewListener(lType string, ip string, port int) (Listener, error) {
 	return listener, nil
 }
 
-func NewSocket(sType string, lip4 string, lip6 string, lport int, rip4 string, rip6 string, rport int, sshUser string, sshSigher ssh.Signer) (Socket, error) {
+func NewSocket(sType string, lip4 string, lip6 string, lport int, rip4 string, rip6 string, rport int, sshUser string, sshPort int, sshSigher ssh.Signer) (Socket, error) {
 	var socket Socket
 	switch strings.ToLower(sType) {
 	case "tcp4":
@@ -182,7 +182,8 @@ func NewSocket(sType string, lip4 string, lip6 string, lport int, rip4 string, r
 		if err != nil {
 			return nil, err
 		}
-		socket, err = NewSSHSocket(raddr4, "tcp4", rport, sshUser, sshSigher)
+		sshAddr := fmt.Sprintf("%s:%d", rip4, sshPort)
+		socket, err = NewSSHSocket(raddr4, "tcp4", sshAddr, sshUser, sshSigher)
 		if err != nil {
 			return nil, err
 		}
@@ -193,7 +194,8 @@ func NewSocket(sType string, lip4 string, lip6 string, lport int, rip4 string, r
 		if err != nil {
 			return nil, err
 		}
-		socket, err = NewSSHSocket(raddr6, "tcp6", rport, sshUser, sshSigher)
+		sshAddr := fmt.Sprintf("[%s]:%d", rip6, sshPort)
+		socket, err = NewSSHSocket(raddr6, "tcp6", sshAddr, sshUser, sshSigher)
 		if err != nil {
 			return nil, err
 		}
