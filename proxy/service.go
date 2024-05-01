@@ -87,10 +87,20 @@ func (service *Service) extractMetadata() (err error) {
 	secretKey := security.AesGenKey(32) // only for encrypt/decrypt metadata
 	dict := make(map[string]interface{})
 	if service.P2PAddrV4 != "" {
+		service.P2PPort, err = conn.GetAvailablePort("udp4")
+		if err != nil {
+			log.Error("Get available port failed. Error: %v", err)
+			return
+		}
 		dict["Addr"] = service.P2PAddrV4
 		dict["Port"] = strconv.Itoa(service.P2PPort)
 		dict["Network"] = "udp4"
 	} else if service.P2PAddrV6 != "" {
+		service.P2PPort, err = conn.GetAvailablePort("udp6")
+		if err != nil {
+			log.Error("Get available port failed. Error: %v", err)
+			return
+		}
 		dict["Addr"] = service.P2PAddrV6
 		dict["Port"] = strconv.Itoa(service.P2PPort)
 		dict["Network"] = "udp6"
@@ -219,7 +229,6 @@ func RegisterService(
 	tunnelType string,
 	p2pAddrV4 string,
 	p2pAddrV6 string,
-	p2pPort int,
 ) {
 	if _, ok := services[name]; ok {
 		panic("service already exists")
@@ -232,7 +241,6 @@ func RegisterService(
 		TunnelType: tunnelType,
 		P2PAddrV4:  p2pAddrV4,
 		P2PAddrV6:  p2pAddrV6,
-		P2PPort:    p2pPort,
 	}
 }
 

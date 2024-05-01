@@ -180,21 +180,12 @@ func LoadConf(confFile string, args map[string]interface{}) error {
 			tunnelType := v["TunnelType"]
 			p2pAddrV4 := ""
 			p2pAddrV6 := ""
-			p2pPort := 0
 			if _, ok := v["P2PAddrV4"]; ok {
 				p2pAddrV4 = v["P2PAddrV4"]
-				p2pPort, err = strconv.Atoi(v["P2PPort"])
-				if err != nil {
-					return err
-				}
 			} else if _, ok := v["P2PAddrV6"]; ok {
 				p2pAddrV6 = v["P2PAddrV6"]
-				p2pPort, err = strconv.Atoi(v["P2PPort"])
-				if err != nil {
-					return err
-				}
 			}
-			proxy.RegisterService(name, proxyPort, proxyType, tunnelPort, tunnelType, p2pAddrV4, p2pAddrV6, p2pPort)
+			proxy.RegisterService(name, proxyPort, proxyType, tunnelPort, tunnelType, p2pAddrV4, p2pAddrV6)
 		}
 	}
 	return nil

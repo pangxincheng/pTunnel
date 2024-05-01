@@ -6,6 +6,7 @@ import (
 	"net"
 	"pTunnel/utils/consts"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -200,4 +201,68 @@ func NewSocket(sType string, lip4 string, lip6 string, lport int, rip4 string, r
 		return nil, errors.New("unsupported socket type: " + sType)
 	}
 	return socket, nil
+}
+
+func GetAvailablePort(lType string) (port int, err error) {
+	switch strings.ToLower(lType) {
+	case "tcp4":
+		var addr *net.TCPAddr
+		var listener *net.TCPListener
+		addr, err = net.ResolveTCPAddr("tcp4", "0.0.0.0:0")
+		if err != nil {
+			return
+		}
+		listener, err = net.ListenTCP("tcp4", addr)
+		if err != nil {
+			return
+		}
+		port = listener.Addr().(*net.TCPAddr).Port
+		listener.Close()
+		time.Sleep(100 * time.Millisecond)
+	case "tcp6":
+		var addr *net.TCPAddr
+		var listener *net.TCPListener
+		addr, err = net.ResolveTCPAddr("tcp6", "[::]:0")
+		if err != nil {
+			return
+		}
+		listener, err = net.ListenTCP("tcp6", addr)
+		if err != nil {
+			return
+		}
+		port = listener.Addr().(*net.TCPAddr).Port
+		listener.Close()
+		time.Sleep(100 * time.Millisecond)
+	case "udp4":
+		var addr *net.UDPAddr
+		var listener *net.UDPConn
+		addr, err = net.ResolveUDPAddr("udp4", "0.0.0.0:0")
+		if err != nil {
+			return
+		}
+		listener, err = net.ListenUDP("udp4", addr)
+		if err != nil {
+			return
+		}
+		port = listener.LocalAddr().(*net.UDPAddr).Port
+		listener.Close()
+		time.Sleep(100 * time.Millisecond)
+	case "udp6":
+		var addr *net.UDPAddr
+		var listener *net.UDPConn
+		addr, err = net.ResolveUDPAddr("udp6", "[::]:0")
+		if err != nil {
+			return
+		}
+		listener, err = net.ListenUDP("udp6", addr)
+		if err != nil {
+			return
+		}
+		port = listener.LocalAddr().(*net.UDPAddr).Port
+		listener.Close()
+		time.Sleep(100 * time.Millisecond)
+	default:
+		err = errors.New("unsupported listener type: " + lType)
+	}
+	return
 }

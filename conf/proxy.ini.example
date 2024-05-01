@@ -45,9 +45,8 @@ TunnelPort = 35875
 ; 内网的Client中的TunnelType一致
 TunnelType = p2p4
 
-; 如果想要显式指定本机p2p的公网地址, 则可以在此处(P2PAddrAndPortV4/P2PAddrAndPortV6)和P2PPort指定
+; 如果想要显式指定本机p2p的公网地址, 则可以在此处(P2PAddrAndPortV4/P2PAddrAndPortV6)指定
 ; 否则将使用UDP打洞来获取公网地址
 ; P2PAddrV4 = 10.42.0.16
 ; P2pAddrV6 = [fe80::f0d1:1e0d:1e0d:1e0d]
-; P2PPort = 48532
 
