@@ -52,7 +52,7 @@ New：目前已经为该工具添加了P2P的支持，其核心技术是使用UD
             go build -ldflags "-X pTunnel/utils/version.version=$VERSION" \
             -o pTunnelProxy cmd/server/pTunnelProxy.go
             ```
-    2. 法二: 从release下载(在ubuntu-latest上进行编译得到，可以缺少库文件)
+    2. 法二: 从release下载(在ubuntu-latest上进行编译得到，可能缺少库文件)
 2. 在服务器上生成RSA公钥和密钥
 ```shell
 ./pTunnelGenRSAKey
