@@ -379,7 +379,7 @@ $$
 
 N-p的曲线如下图所示
 
-<div style="text-align:center;">
+<div align="center">
   <img src="doc/fig/prob.png" alt="N-p" style="width:50%; height:auto;" />
   <p style="font-size: smaller; color: grey;">图2: N-p</p>
 </div>
