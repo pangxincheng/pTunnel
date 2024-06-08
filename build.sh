@@ -36,10 +36,10 @@ do
     cp -r ./conf/*.example ./release/build/$i-$j/conf
     cp LICENSE ./release/build/$i-$j
     cp README.md ./release/build/$i-$j
-    GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelClient cmd/client/pTunnelClient.go
-    GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelServer cmd/server/pTunnelServer.go
-    GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelProxy cmd/proxy/pTunnelProxy.go
-    GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelGenRSAKey cmd/genRSAKey/pTunnelGenRSAKey.go
+    CGO_ENABLED=0 GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelClient cmd/client/pTunnelClient.go
+    CGO_ENABLED=0 GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelServer cmd/server/pTunnelServer.go
+    CGO_ENABLED=0 GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelProxy cmd/proxy/pTunnelProxy.go
+    CGO_ENABLED=0 GOOS=$i GOARCH=$j go build -ldflags "-X pTunnel/utils/version.version=$VERSION" -o ./release/build/$i-$j/pTunnelGenRSAKey cmd/genRSAKey/pTunnelGenRSAKey.go
     # check whether the os is windows, if yes, add .exe suffix
     if [ $i = "windows" ]; then
       mv ./release/build/$i-$j/pTunnelClient ./release/build/$i-$j/pTunnelClient.exe
